@@ -4,7 +4,7 @@ const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
 const sequelize = require('./config/db');
-const { User, Message } = require('./models');
+const { User, Message } = require('./models'); // from models/index.js
 
 const signupRoute = require('./routes/signup');
 const loginRoute = require('./routes/login');
@@ -19,11 +19,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Handle CORS preflight
 app.options('*', cors());
 
 // Routes
@@ -47,31 +44,30 @@ io.on('connection', async (socket) => {
     const recentMessages = await Message.findAll({
       order: [['createdAt', 'ASC']],
       limit: 50,
-      include: [{ model: User, as: 'user', attributes: ['name'] }]  // use 'name'
+      include: [{ model: User, as: 'user', attributes: ['name'] }]
     });
 
     socket.emit('recentMessages', recentMessages.map(msg => ({
       id: msg.id,
       message: msg.content,
       createdAt: msg.createdAt,
-      user: msg.user ? msg.user.name : msg.name || 'Unknown'  // use 'name'
+      user: msg.user ? msg.user.name : 'Unknown'
     })));
   } catch (err) {
     console.error('❌ Error fetching messages:', err);
   }
 
-  // Handle user joining
+  // Track user info after join
   socket.on('join', async (username) => {
     try {
       if (!username || username.trim() === '') return;
 
-      // Find or create user in DB using 'name'
       let user = await User.findOne({ where: { name: username } });
       if (!user) {
         user = await User.create({
           name: username,
           email: `${username}@example.com`,
-          password: 'temp' // hash this in real app
+          password: 'temp' // hash in real app
         });
       }
 
@@ -79,21 +75,19 @@ io.on('connection', async (socket) => {
 
       // Broadcast user joined
       io.emit('userJoined', { user: user.name, message: `${user.name} has joined the chat` });
-
       console.log(`✅ ${user.name} joined`);
     } catch (err) {
       console.error('❌ Error handling join:', err);
     }
   });
 
-  // Handle chat messages
+  // Handle incoming chat messages
   socket.on('chatMessage', async (msg) => {
     const user = socket.data.user;
     if (!user) return;
 
     try {
       const savedMessage = await Message.create({
-        username: user.name,  // this is message's username field (you can keep this or remove if you use userId)
         content: msg,
         userId: user.id
       });
@@ -109,7 +103,7 @@ io.on('connection', async (socket) => {
     }
   });
 
-  // Handle user leaving
+  // Handle disconnect
   socket.on('disconnect', () => {
     if (socket.data.user) {
       io.emit('userLeft', { user: socket.data.user.name, message: `${socket.data.user.name} has left the chat` });
@@ -118,11 +112,13 @@ io.on('connection', async (socket) => {
   });
 });
 
-// Start server after syncing database tables
+// Sync DB and start server
 sequelize.sync({ alter: true })
   .then(() => {
     server.listen(4000, () => {
       console.log('✅ Server running on port 4000');
     });
   })
-  .catch(err => console.error('❌ DB connection error:', err));
+  .catch(err => {
+    console.error('❌ DB connection error:', err);
+  });

@@ -6,10 +6,8 @@ const messageInput = document.getElementById("messageInput");
 const userList = document.getElementById("userList");
 const leaveBtn = document.getElementById("leaveBtn");
 
-// Manage list of online users locally
 let onlineUsers = new Set();
 
-// Get username from localStorage or prompt user
 let username = localStorage.getItem("username");
 if (!username) {
   username = prompt("Enter your name:");
@@ -21,12 +19,10 @@ if (!username) {
   }
 }
 
-// Join chat and send username to server
 socket.emit("join", username);
 
-// Listen for recent messages on connection
 socket.on("recentMessages", (messages) => {
-  chatBox.innerHTML = ""; // clear existing messages
+  chatBox.innerHTML = "";
   messages.forEach((msg) => {
     displayMessage({
       user: msg.user,
@@ -36,7 +32,6 @@ socket.on("recentMessages", (messages) => {
   });
 });
 
-// Listen for new chat messages
 socket.on("chatMessage", (data) => {
   displayMessage({
     user: data.user,
@@ -45,25 +40,16 @@ socket.on("chatMessage", (data) => {
   });
 });
 
-// Listen for user joined notifications
 socket.on("userJoined", (data) => {
   displayNotification(data.message);
   addUserToList(data.user);
 });
 
-// Listen for user left notifications
 socket.on("userLeft", (data) => {
   displayNotification(data.message);
   removeUserFromList(data.user);
 });
 
-// Listen for updated user list (optional)
-socket.on("userList", (users) => {
-  onlineUsers = new Set(users);
-  renderUserList();
-});
-
-// Send chat message on form submit
 messageForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const text = messageInput.value.trim();
@@ -74,24 +60,21 @@ messageForm.addEventListener("submit", (e) => {
   }
 });
 
-// Leave chat button
 leaveBtn.addEventListener("click", () => {
   socket.emit("leave", username);
   localStorage.removeItem("username");
   window.location.reload();
 });
 
-// Display a chat message
 function displayMessage({ user, text, self }) {
   const div = document.createElement("div");
   div.classList.add("message");
   div.classList.add(self ? "self" : "other");
-  div.innerHTML = `<strong>${user}:</strong> ${escapeHtml(text)}`;
+  div.innerHTML = `<strong>${escapeHtml(user)}:</strong> ${escapeHtml(text)}`;
   chatBox.appendChild(div);
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// Display join/leave notifications
 function displayNotification(text) {
   const div = document.createElement("div");
   div.classList.add("notification");
@@ -100,7 +83,6 @@ function displayNotification(text) {
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// Add user to online users set and update UI
 function addUserToList(user) {
   if (!onlineUsers.has(user)) {
     onlineUsers.add(user);
@@ -108,7 +90,6 @@ function addUserToList(user) {
   }
 }
 
-// Remove user from online users set and update UI
 function removeUserFromList(user) {
   if (onlineUsers.has(user)) {
     onlineUsers.delete(user);
@@ -116,7 +97,6 @@ function removeUserFromList(user) {
   }
 }
 
-// Render the user list UI
 function renderUserList() {
   userList.innerHTML = "<h3>Online Users</h3>";
   onlineUsers.forEach((user) => {
@@ -126,7 +106,6 @@ function renderUserList() {
   });
 }
 
-// Basic HTML escaping to avoid injection
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
