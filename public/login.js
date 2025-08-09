@@ -1,29 +1,33 @@
-document.getElementById("loginForm").addEventListener("submit", async function (e) {
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value.trim();
 
+    if (!email || !password) {
+        alert("Please fill in all fields.");
+        return;
+    }
+
     try {
-        const response = await fetch("http://localhost:4000/login", {
+        const res = await fetch("http://localhost:4000/login", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password })
         });
 
-        const data = await response.json();
+        const data = await res.json();
 
-        if (response.ok) {
-            alert("✅ Login successful!");
-            localStorage.setItem("token", data.token); // Save JWT
-            window.location.href = "chat.html"; // Redirect after login
-        } else {
-            alert(data.message || "❌ Invalid email or password");
+        if (!res.ok) {
+            alert(data.message || "Login failed");
+            return;
         }
+
+        alert("✅ Login successful!");
+        localStorage.setItem("token", data.token);
+        window.location.href = "chat.html";
     } catch (err) {
         console.error("Error:", err);
-        alert("❌ Error connecting to server");
+        alert("Error connecting to server");
     }
 });

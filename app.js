@@ -1,103 +1,128 @@
 require('dotenv').config();
-
 const express = require('express');
-const cors = require('cors');
-const path = require('path');
 const http = require('http');
+const cors = require('cors');
 const { Server } = require('socket.io');
 const sequelize = require('./config/db');
+const { User, Message } = require('./models');
 
-const loginRoute = require('./routes/login');
 const signupRoute = require('./routes/signup');
+const loginRoute = require('./routes/login');
 
 const app = express();
-
-app.use(express.json());
-
-// CORS config - allow frontend origins that you serve from
-app.use(cors({
-  origin: ['http://localhost:5500', 'http://127.0.0.1:5500', 'http://localhost:4000'],
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
-
-app.options('*', cors());
-
-// Serve static frontend files from 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Connect and sync database
-sequelize.authenticate()
-  .then(() => sequelize.sync())
-  .then(() => console.log('DB connected & synced'))
-  .catch(err => console.error('DB connection error:', err));
-
-// API routes for login and signup
-app.use('/login', loginRoute);
-app.use('/signup', signupRoute);
-
-// Create HTTP server from Express app to use with Socket.io
 const server = http.createServer(app);
 
-// Setup Socket.io with CORS options
+// Middleware
+app.use(cors({
+  origin: ['http://127.0.0.1:5500', 'http://localhost:5500'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Handle CORS preflight
+app.options('*', cors());
+
+// Routes
+app.use('/signup', signupRoute);
+app.use('/login', loginRoute);
+
+// Socket.io Setup
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5500', 'http://127.0.0.1:5500'],
-    methods: ['GET', 'POST']
+    origin: ['http://127.0.0.1:5500', 'http://localhost:5500'],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    credentials: true,
   }
 });
 
-// In-memory storage of users and chat messages
-const users = new Map();   // socket.id -> username
-const messages = [];       // Array of { type, user?, text }
+io.on('connection', async (socket) => {
+  console.log('🔌 User connected:', socket.id);
 
-// Socket.io connection handler
-io.on('connection', (socket) => {
-  console.log('New user connected:', socket.id);
+  // Send last 50 messages to newly connected user
+  try {
+    const recentMessages = await Message.findAll({
+      order: [['createdAt', 'ASC']],
+      limit: 50,
+      include: [{ model: User, as: 'user', attributes: ['name'] }]  // use 'name'
+    });
 
-  // Send all previous messages & notifications to newly connected client
-  socket.emit('chatHistory', messages);
+    socket.emit('recentMessages', recentMessages.map(msg => ({
+      id: msg.id,
+      message: msg.content,
+      createdAt: msg.createdAt,
+      user: msg.user ? msg.user.name : msg.name || 'Unknown'  // use 'name'
+    })));
+  } catch (err) {
+    console.error('❌ Error fetching messages:', err);
+  }
 
-  // Listen for user joining and save username
-  socket.on('join', (username) => {
-    users.set(socket.id, username);
+  // Handle user joining
+  socket.on('join', async (username) => {
+    try {
+      if (!username || username.trim() === '') return;
 
-    const joinMsg = { type: 'notification', text: `${username} joined the chat` };
-    messages.push(joinMsg);
+      // Find or create user in DB using 'name'
+      let user = await User.findOne({ where: { name: username } });
+      if (!user) {
+        user = await User.create({
+          name: username,
+          email: `${username}@example.com`,
+          password: 'temp' // hash this in real app
+        });
+      }
 
-    // Broadcast join notification to all clients
-    io.emit('notification', joinMsg.text);
-  });
+      socket.data.user = { id: user.id, name: user.name };
 
-  // Listen for new chat messages from clients
-  socket.on('chatMessage', (msg) => {
-    const user = users.get(socket.id) || 'Unknown';
+      // Broadcast user joined
+      io.emit('userJoined', { user: user.name, message: `${user.name} has joined the chat` });
 
-    const messageObj = { type: 'message', user, text: msg };
-    messages.push(messageObj);
-
-    // Broadcast message to all clients
-    io.emit('message', messageObj);
-  });
-
-  // Handle user disconnect
-  socket.on('disconnect', () => {
-    const username = users.get(socket.id);
-
-    if (username) {
-      const leaveMsg = { type: 'notification', text: `${username} left the chat` };
-      messages.push(leaveMsg);
-
-      io.emit('notification', leaveMsg.text);
-      users.delete(socket.id);
+      console.log(`✅ ${user.name} joined`);
+    } catch (err) {
+      console.error('❌ Error handling join:', err);
     }
-    console.log('User disconnected:', socket.id);
+  });
+
+  // Handle chat messages
+  socket.on('chatMessage', async (msg) => {
+    const user = socket.data.user;
+    if (!user) return;
+
+    try {
+      const savedMessage = await Message.create({
+        username: user.name,  // this is message's username field (you can keep this or remove if you use userId)
+        content: msg,
+        userId: user.id
+      });
+
+      io.emit('chatMessage', {
+        id: savedMessage.id,
+        message: savedMessage.content,
+        createdAt: savedMessage.createdAt,
+        user: user.name
+      });
+    } catch (err) {
+      console.error('❌ Error saving message:', err);
+    }
+  });
+
+  // Handle user leaving
+  socket.on('disconnect', () => {
+    if (socket.data.user) {
+      io.emit('userLeft', { user: socket.data.user.name, message: `${socket.data.user.name} has left the chat` });
+      console.log(`❌ ${socket.data.user.name} disconnected`);
+    }
   });
 });
 
-// Start server on port from .env or default 4000
-const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
-  console.log(`Server + Socket.io running at http://localhost:${PORT}`);
-});
+// Start server after syncing database tables
+sequelize.sync({ alter: true })
+  .then(() => {
+    server.listen(4000, () => {
+      console.log('✅ Server running on port 4000');
+    });
+  })
+  .catch(err => console.error('❌ DB connection error:', err));

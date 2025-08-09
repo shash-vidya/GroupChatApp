@@ -3,31 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js" integrity="sha384-KA7m0DwgQGmeRC6Xre3hJO+ZxpanOauVh4Czdqbg8lDKJ3bZZYVYmP+y4F31x40L" crossorigin="anonymous"></script>
-
-  <title>Real-Time Chat</title>
+  <title>Group Chat</title>
   <link rel="stylesheet" href="chat.css" />
 </head>
 <body>
+  <div class="chat-container">
+    <!-- Chat Header -->
+    <header>
+      <h1>💬 Real-time Group Chat</h1>
+      <button id="leaveBtn">Leave Chat</button>
+    </header>
 
-<div id="loginScreen" class="centered">
-  <h2>Enter Username to Join Chat</h2>
-  <input type="text" id="usernameInput" placeholder="Username" />
-  <button id="joinBtn">Join Chat</button>
-</div>
+    <!-- Online Users -->
+    <aside id="userList" class="user-list">
+      <h3>Online Users</h3>
+      <!-- Users will be dynamically added here -->
+    </aside>
 
-<div id="chatScreen" class="hidden">
-  <header>Real-Time Chat</header>
-  <div id="chatContainer"></div>
-  <div id="inputArea">
-    <input type="text" id="messageInput" placeholder="Type your message..." autocomplete="off" />
-    <button id="sendBtn">Send</button>
+    <!-- Chat Messages -->
+    <main id="chatBox" class="chat-box">
+      <!-- Messages & notifications will be dynamically added here -->
+    </main>
+
+    <!-- Message Input -->
+    <form id="messageForm" autocomplete="off">
+      <input
+        type="text"
+        id="messageInput"
+        placeholder="Type your message..."
+        required
+      />
+      <button type="submit">Send</button>
+    </form>
   </div>
-</div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script src="chat.js"></script>
-
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script src="chat.js"></script>
 </body>
 </html>

@@ -1,96 +1,101 @@
 body {
-  margin: 0;
   font-family: Arial, sans-serif;
-  background: #f0f2f5;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+  background-color: #f4f6f8;
+  margin: 0;
+  padding: 0;
 }
 
-.centered {
+.chat-container {
+  max-width: 900px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
   height: 100vh;
-}
-
-.hidden {
-  display: none;
 }
 
 header {
-  background-color: #4a76a8;
+  background-color: #007bff;
   color: white;
-  padding: 1rem;
-  font-size: 1.5rem;
-  text-align: center;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-#chatContainer {
+.user-list {
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 10px;
+  height: 80px;
+  overflow-x: auto;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.user-list span {
+  background: #007bff;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 12px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.chat-box {
   flex: 1;
-  padding: 1rem;
+  padding: 10px;
   overflow-y: auto;
-  background: white;
-  max-height: calc(100vh - 130px);
+  background: #ffffff;
+  border: 1px solid #ddd;
 }
 
 .message {
-  margin-bottom: 0.75rem;
+  padding: 8px;
+  margin-bottom: 10px;
+  border-radius: 8px;
   max-width: 70%;
-  padding: 0.5rem 0.75rem;
-  border-radius: 10px;
   word-wrap: break-word;
-  line-height: 1.3;
 }
 
 .message.self {
   background-color: #dcf8c6;
+  text-align: right;
   margin-left: auto;
-  color: #222;
-  border-bottom-right-radius: 0;
 }
 
 .message.other {
-  background-color: #ececec;
-  color: #333;
+  background-color: #f1f0f0;
+  text-align: left;
   margin-right: auto;
-  border-bottom-left-radius: 0;
 }
 
 .notification {
   text-align: center;
+  color: #888;
   font-style: italic;
-  color: #555;
-  margin: 1rem 0;
+  margin: 5px 0;
 }
 
-#inputArea {
+#messageForm {
   display: flex;
-  padding: 0.5rem;
-  background: #eee;
+  background: #fff;
+  border-top: 1px solid #ddd;
 }
 
 #messageInput {
   flex: 1;
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  border-radius: 20px;
-  border: 1px solid #ccc;
-  outline: none;
-}
-
-#sendBtn {
-  margin-left: 0.5rem;
-  padding: 0 1.5rem;
+  padding: 10px;
   border: none;
-  background-color: #4a76a8;
-  color: white;
-  border-radius: 20px;
-  cursor: pointer;
-  font-weight: bold;
+  outline: none;
+  font-size: 16px;
 }
 
-#sendBtn:hover {
-  background-color: #3b5c7a;
+#messageForm button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 0 20px;
+  cursor: pointer;
+  font-size: 16px;
 }

@@ -1,31 +1,29 @@
-// routes/signup.js
 const express = require('express');
 const bcrypt = require('bcrypt');
-const User = require('../models/User'); // ✅ correct relative path
+const { User } = require('../models');
 
 const router = express.Router();
 
-// POST /signup
 router.post('/', async (req, res) => {
   const { name, email, phone, password } = req.body;
 
+  if (!name || !email || !password) {
+    return res.status(400).json({ message: 'Name, email, and password are required' });
+  }
+
   try {
-    // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      return res.status(409).json({ message: 'User already exists, please login' });
+      return res.status(409).json({ message: 'User already exists' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await User.create({ name, email, phone, password: hashedPassword });
 
-    // Create user
-    await User.create({ name, email, phone, password: hashedPassword });
-
-    res.status(201).json({ message: 'Successfully signed up' });
+    res.status(201).json({ message: 'User created successfully', userId: newUser.id });
   } catch (err) {
-    console.error('Signup Error:', err);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('Signup error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
