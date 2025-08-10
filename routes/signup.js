@@ -22,9 +22,9 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ message: 'User created successfully', userId: newUser.id });
   } catch (err) {
-    console.error('Signup error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
+  console.error('Signup error:', err);
+  res.status(500).json({ message: err.message, stack: err.stack });
+}
 });
 
 module.exports = router;

@@ -3,37 +3,73 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Group Chat</title>
+  <title>💬 Real-time Group Chat</title>
   <link rel="stylesheet" href="chat.css" />
 </head>
 <body>
+  <!-- Username Modal -->
+  <div id="usernameModal" class="modal">
+    <div class="modal-content">
+      <h2>Enter your name to join the chat</h2>
+      <input type="text" id="usernameInput" placeholder="Your name" />
+      <button id="usernameSubmitBtn">Join Chat</button>
+    </div>
+  </div>
+
   <div class="chat-container">
     <!-- Chat Header -->
     <header>
       <h1>💬 Real-time Group Chat</h1>
+      <div id="currentGroupName"></div>
+
       <button id="leaveBtn">Leave Chat</button>
     </header>
 
-    <!-- Online Users -->
-    <aside id="userList" class="user-list">
-      <h3>Online Users</h3>
+    <!-- Sidebar Groups List -->
+    <aside class="sidebar">
+      <h3>Groups</h3>
+      <ul id="groupList" class="group-list"></ul>
+      <button id="createGroupBtn" class="create-group-btn">+ Create Group</button>
     </aside>
 
-    <!-- Chat Messages -->
-    <main id="chatBox" class="chat-box">
-      <!-- Messages & notifications will be dynamically added here -->
-    </main>
+    <!-- Chat Area -->
+    <main class="chat-main">
+      <!-- Online Users -->
+      <section id="userList" class="user-list">
+        <h3>Online Users</h3>
+        <!-- Buttons added dynamically -->
+      </section>
 
-    <!-- Message Input -->
-    <form id="messageForm" autocomplete="off">
-      <input
-        type="text"
-        id="messageInput"
-        placeholder="Type your message..."
-        required
-      />
-      <button type="submit">Send</button>
-    </form>
+      <!-- Messages -->
+      <section id="chatBox" class="chat-box">
+        <!-- Messages appear here -->
+      </section>
+
+      <!-- Message Input -->
+      <form id="messageForm" autocomplete="off" class="message-form">
+        <input
+          type="text"
+          id="messageInput"
+          placeholder="Type your message..."
+          required
+          autocomplete="off"
+          disabled
+        />
+        <button type="submit" disabled>Send</button>
+      </form>
+    </main>
+  </div>
+
+  <!-- Create Group Modal -->
+  <div id="groupModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Create New Group</h2>
+      <input type="text" id="newGroupName" placeholder="Group name" />
+      <div class="modal-buttons">
+        <button id="saveGroupBtn">Save</button>
+        <button id="cancelGroupBtn">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>

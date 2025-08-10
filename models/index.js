@@ -1,7 +1,25 @@
 const User = require('./User');
 const Message = require('./Message');
+const Group = require('./Group');
+const GroupMember = require('./GroupMember');
 
-User.hasMany(Message, { foreignKey: 'userId' });
-Message.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+// Associations
+Message.belongsTo(User, { as: 'User', foreignKey: 'userId' });
+User.hasMany(Message, { as: 'Messages', foreignKey: 'userId' });
 
-module.exports = { User, Message };
+Message.belongsTo(Group, { as: 'Group', foreignKey: 'groupId' });
+Group.hasMany(Message, { as: 'Messages', foreignKey: 'groupId' });
+
+// Many-to-Many User <-> Group through GroupMember
+// User.js
+User.belongsToMany(Group, { through: GroupMember, as: 'Groups', foreignKey: 'userId' });
+
+// Group.js
+Group.belongsToMany(User, { through: GroupMember, as: 'Users', foreignKey: 'groupId' });
+
+module.exports = {
+  User,
+  Message,
+  Group,
+  GroupMember,
+};

@@ -7,8 +7,6 @@ const router = express.Router();
 
 router.post('/', async (req, res) => {
   try {
-    console.log('📩 Login request body:', req.body);
-
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -34,7 +32,7 @@ router.post('/', async (req, res) => {
     res.status(200).json({
       token,
       user: { id: user.id, name: user.name, email: user.email },
-      message: 'Login successful'
+      message: 'Login successful',
     });
   } catch (error) {
     console.error('❌ Login error:', error);

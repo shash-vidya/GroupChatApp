@@ -1,124 +1,156 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const cors = require('cors');
 const { Server } = require('socket.io');
 const sequelize = require('./config/db');
-const { User, Message } = require('./models'); // from models/index.js
+const { User, Message, Group, GroupMember } = require('./models');
 
 const signupRoute = require('./routes/signup');
 const loginRoute = require('./routes/login');
+const protectedRoute = require('./routes/protected');
+const messageRoute = require('./routes/messages');
+const groupsRoute = require('./routes/groups');
+const loginOrCreateUserRoute = require('./routes/login-or-create-user');
+const userRoutes = require('./routes/user');
 
 const app = express();
 const server = http.createServer(app);
 
-// Middleware
-app.use(cors({
-  origin: ['http://127.0.0.1:5500', 'http://localhost:5500'],
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-}));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.options('*', cors());
-
-// Routes
-app.use('/signup', signupRoute);
-app.use('/login', loginRoute);
-
-// Socket.io Setup
 const io = new Server(server, {
   cors: {
-    origin: ['http://127.0.0.1:5500', 'http://localhost:5500'],
-    methods: ['GET', 'POST', 'OPTIONS'],
-    credentials: true,
-  }
+    origin: 'http://127.0.0.1:5500',
+    methods: ['GET', 'POST'],
+  },
 });
 
-io.on('connection', async (socket) => {
-  console.log('🔌 User connected:', socket.id);
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-  // Send last 50 messages to newly connected user
-  try {
-    const recentMessages = await Message.findAll({
-      order: [['createdAt', 'ASC']],
-      limit: 50,
-      include: [{ model: User, as: 'user', attributes: ['name'] }]
-    });
+// Add io to req for routes if needed
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
-    socket.emit('recentMessages', recentMessages.map(msg => ({
-      id: msg.id,
-      message: msg.content,
-      createdAt: msg.createdAt,
-      user: msg.user ? msg.user.name : 'Unknown'
-    })));
-  } catch (err) {
-    console.error('❌ Error fetching messages:', err);
-  }
+// Mount routes
+app.use('/api/signup', signupRoute);
+app.use('/api/login', loginRoute);
+app.use('/api/protected', protectedRoute);
+app.use('/api/messages', messageRoute);
+app.use('/api/groups', groupsRoute);
+app.use('/api/login-or-create-user', loginOrCreateUserRoute);
+app.use('/api/users', userRoutes);
 
-  // Track user info after join
-  socket.on('join', async (username) => {
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Socket.IO group chat handling
+io.on('connection', (socket) => {
+  console.log('New user connected:', socket.id);
+
+  // Track groups this socket has joined
+  socket.joinedGroups = new Set();
+
+  // Save username on join (optional)
+  socket.on('join', (username) => {
+    if (!username) return;
+    socket.username = username;
+    console.log(`Socket ${socket.id} associated with username: ${username}`);
+  });
+
+  // Client requests groups for a user
+  socket.on('getGroups', async (userId) => {
     try {
-      if (!username || username.trim() === '') return;
-
-      let user = await User.findOne({ where: { name: username } });
-      if (!user) {
-        user = await User.create({
-          name: username,
-          email: `${username}@example.com`,
-          password: 'temp' // hash in real app
-        });
+      if (!userId) {
+        socket.emit('groupsList', []);
+        return;
       }
+      // Find all groups where user is a member
+      const userGroups = await Group.findAll({
+        include: [{
+          model: User,
+          as: 'Users',
+          where: { id: userId },
+          attributes: [],
+          through: { attributes: [] }
+        }],
+        attributes: ['id', 'name'],
+      });
 
-      socket.data.user = { id: user.id, name: user.name };
+      // Join rooms for all groups for message broadcasting
+      userGroups.forEach(group => {
+        socket.join(group.id.toString());
+        socket.joinedGroups.add(group.id.toString());
+      });
 
-      // Broadcast user joined
-      io.emit('userJoined', { user: user.name, message: `${user.name} has joined the chat` });
-      console.log(`✅ ${user.name} joined`);
+      // Send groups list back to client
+      socket.emit('groupsList', userGroups.map(g => ({ id: g.id, name: g.name })));
+
     } catch (err) {
-      console.error('❌ Error handling join:', err);
+      console.error('Error fetching groups:', err);
+      socket.emit('groupsList', []);
     }
   });
 
   // Handle incoming chat messages
-  socket.on('chatMessage', async (msg) => {
-    const user = socket.data.user;
-    if (!user) return;
+  socket.on('chatMessage', async ({ user, text, groupId }) => {
+    if (!user || !text || !groupId) return;
 
     try {
-      const savedMessage = await Message.create({
-        content: msg,
-        userId: user.id
+      // Find user record
+      const userRecord = await User.findOne({ where: { name: user } });
+      if (!userRecord) {
+        console.error('User not found for message:', user);
+        return;
+      }
+
+      // Check if user belongs to the group
+      const membership = await GroupMember.findOne({
+        where: { userId: userRecord.id, groupId }
+      });
+      if (!membership) {
+        console.error(`User ${user} is not a member of group ${groupId}`);
+        return;
+      }
+
+      // Save message to DB
+      const message = await Message.create({
+        content: text,
+        userId: userRecord.id,
+        groupId,
       });
 
-      io.emit('chatMessage', {
-        id: savedMessage.id,
-        message: savedMessage.content,
-        createdAt: savedMessage.createdAt,
-        user: user.name
+      // Broadcast message to group room only
+      io.to(groupId.toString()).emit('message', {
+        user,
+        text,
+        groupId,
+        createdAt: message.createdAt,
       });
+
     } catch (err) {
-      console.error('❌ Error saving message:', err);
+      console.error('Error saving or broadcasting message:', err);
     }
   });
 
-  // Handle disconnect
+  // Handle disconnects
   socket.on('disconnect', () => {
-    if (socket.data.user) {
-      io.emit('userLeft', { user: socket.data.user.name, message: `${socket.data.user.name} has left the chat` });
-      console.log(`❌ ${socket.data.user.name} disconnected`);
-    }
+    console.log('User disconnected:', socket.id);
   });
 });
 
-// Sync DB and start server
-sequelize.sync({ alter: true })
+// Sequelize sync & start server
+ sequelize.sync({ force: true })
   .then(() => {
-    server.listen(4000, () => {
-      console.log('✅ Server running on port 4000');
+    const PORT = process.env.PORT || 4000;
+    server.listen(PORT, () => {
+      console.log(`✅ Server running on port ${PORT}`);
     });
   })
-  .catch(err => {
-    console.error('❌ DB connection error:', err);
+  .catch((err) => {
+    console.error('❌ Database connection error:', err);
   });
