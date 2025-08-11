@@ -4,21 +4,28 @@ body {
   background-color: #f0f4f8;
   margin: 0;
   padding: 0;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .chat-container {
   max-width: 900px;
+  width: 100%;
   margin: 20px auto;
   display: flex;
-  flex-direction: column;
   height: 90vh;
   border: 1px solid #ccc;
   border-radius: 12px;
   background: white;
-  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  flex-direction: column;
 }
 
-header {
+/* Header */
+.chat-header {
   background-color: #4a90e2;
   color: white;
   padding: 15px 20px;
@@ -26,54 +33,185 @@ header {
   justify-content: space-between;
   align-items: center;
   border-radius: 12px 12px 0 0;
-}
-
-header h1 {
-  margin: 0;
   font-weight: 700;
   font-size: 1.4rem;
 }
 
-header button {
-  background: #f44336;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 24px;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
+.current-group-name {
+  font-weight: 500;
+  font-size: 1.1rem;
+  margin-left: 20px;
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
-header button:hover {
+.btn {
+  border: none;
+  border-radius: 24px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.danger-btn {
+  background-color: #f44336;
+  color: white;
+}
+
+.danger-btn:hover:not(:disabled) {
   background-color: #d32f2f;
 }
 
-/* Online users container */
-.user-list {
+.primary-btn {
+  background-color: #4a90e2;
+  color: white;
+}
+
+.primary-btn:hover:not(:disabled) {
+  background-color: #357ab8;
+}
+
+/* Sidebar */
+.sidebar {
   background: #f9f9f9;
-  border-bottom: 1px solid #ddd;
-  padding: 10px 20px;
+  width: 280px;
+  border-right: 1px solid #ddd;
+  padding: 20px;
+  overflow-y: auto;
   display: flex;
-  align-items: center;
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.sidebar h3 {
+  margin: 0 0 10px;
+  font-weight: 700;
+  color: #333;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.group-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex-grow: 1;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+.group-list li {
+  padding: 10px 15px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #444;
+  margin-bottom: 6px;
+  transition: background-color 0.3s ease;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.group-list li.active,
+.group-list li:hover {
+  background-color: #4a90e2;
+  color: white;
+}
+
+/* User Search */
+#userSearchSection input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  outline: none;
+  box-sizing: border-box;
+  font-size: 1rem;
+}
+
+#userSearchResults {
+  margin-top: 8px;
+  list-style: none;
+  padding: 0;
+  max-height: 120px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: white;
+}
+
+#userSearchResults li {
+  padding: 8px 12px;
+  cursor: pointer;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+#userSearchResults li:hover {
+  background-color: #4a90e2;
+  color: white;
+}
+
+/* Create Group Button */
+.create-group-btn {
+  margin-top: auto;
+}
+
+/* Chat Main */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Online users */
+.user-list {
+  display: flex;
   gap: 12px;
-  border-radius: 0 0 12px 12px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 12px;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .user-list h3 {
   margin: 0;
-  margin-right: 15px;
-  color: #555;
   flex-shrink: 0;
-
-  -webkit-user-select: none; /* Safari */
-  -moz-user-select: none;    /* Firefox */
-  -ms-user-select: none;     /* IE10+ */
-  user-select: none;         /* Standard */
+  color: #555;
 }
 
-/* Online user buttons */
 .user-list button {
   background-color: #4a90e2;
   border: none;
@@ -83,36 +221,34 @@ header button:hover {
   font-size: 0.9rem;
   cursor: default;
   white-space: nowrap;
+  transition: background-color 0.3s ease;
 
-  -webkit-user-select: none; /* Safari */
+  -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-
-  transition: background-color 0.3s ease;
 }
 
 .user-list button:hover {
   background-color: #357ab8;
 }
 
-/* Chat box styles */
+/* Chat box */
 .chat-box {
   flex: 1;
-  padding: 20px;
   overflow-y: auto;
-  background: #fafafa;
   display: flex;
   flex-direction: column;
   gap: 12px;
 
-  -webkit-user-select: text; /* Safari */
+  -webkit-user-select: text;
   -moz-user-select: text;
   -ms-user-select: text;
   user-select: text;
+  padding-right: 10px;
 }
 
-/* Message bubble */
+/* Messages */
 .message {
   max-width: 60%;
   padding: 12px 18px;
@@ -122,30 +258,26 @@ header button:hover {
   box-shadow: 0 3px 8px rgba(0,0,0,0.1);
   word-wrap: break-word;
   position: relative;
+  transition: background-color 0.3s ease;
 
-  -webkit-user-select: text; /* Safari */
+  -webkit-user-select: text;
   -moz-user-select: text;
   -ms-user-select: text;
   user-select: text;
-
-  transition: background-color 0.3s ease;
 }
 
-/* Messages sent by me */
 .message.self {
   background-color: #d2f8d2;
   align-self: flex-end;
   text-align: right;
 }
 
-/* Messages from others */
 .message.other {
   background-color: #f1f0f0;
   align-self: flex-start;
   text-align: left;
 }
 
-/* System notification messages */
 .message.system {
   background-color: transparent;
   color: #666;
@@ -154,19 +286,20 @@ header button:hover {
   max-width: 100%;
   padding: 0;
 
-  -webkit-user-select: none; /* Safari */
+  -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
 }
 
 /* Message form */
-#messageForm {
+.message-form {
   display: flex;
   border-top: 1px solid #ddd;
   background: white;
   padding: 10px 20px;
   border-radius: 0 0 12px 12px;
+  box-sizing: border-box;
 }
 
 #messageInput {
@@ -178,7 +311,7 @@ header button:hover {
   outline: none;
   transition: border-color 0.3s ease;
 
-  -webkit-user-select: text; /* Safari */
+  -webkit-user-select: text;
   -moz-user-select: text;
   -ms-user-select: text;
   user-select: text;
@@ -188,7 +321,7 @@ header button:hover {
   border-color: #4a90e2;
 }
 
-#messageForm button {
+.message-form button {
   background: #4a90e2;
   color: white;
   border: none;
@@ -198,8 +331,92 @@ header button:hover {
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.3s ease;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
-#messageForm button:hover {
+.message-form button:hover:not(:disabled) {
   background-color: #357ab8;
+}
+
+.message-form button:disabled {
+  background-color: #a0b9e9;
+  cursor: not-allowed;
+}
+
+/* Modal styles */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px 40px;
+  border-radius: 12px;
+  max-width: 400px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.modal-content h2 {
+  margin-bottom: 20px;
+}
+
+.modal-content input[type="text"] {
+  width: 100%;
+  padding: 12px 15px;
+  font-size: 1rem;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  outline: none;
+  margin-bottom: 20px;
+
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.cancel-btn {
+  background-color: #ccc;
+  color: #333;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.cancel-btn:hover {
+  background-color: #999;
 }

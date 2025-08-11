@@ -3,34 +3,23 @@ body {
   background-color: #f4f4f4;
 }
 
-.signup-container {
-  width: 350px;
-  margin: 100px auto;
-  padding: 20px;
-  background: white;
+#message {
+  font-weight: 600;
+}
+
+.card {
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
-.signup-container h2 {
-  text-align: center;
-  margin-bottom: 20px;
+.card-header {
+  border-radius: 8px 8px 0 0;
 }
 
-.signup-container input,
-.signup-container button {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 10px;
+.card-footer {
+  border-radius: 0 0 8px 8px;
 }
 
-.signup-container button {
-  background-color: #007bff;
-  border: none;
-  color: white;
-  cursor: pointer;
-}
-
-.signup-container button:hover {
-  background-color: #0056b3;
+input:focus {
+  box-shadow: 0 0 3px #4a90e2;
+  border-color: #4a90e2;
 }

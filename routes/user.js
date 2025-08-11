@@ -1,29 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const { User } = require('../models');
+const { Op } = require('sequelize');
+const userController = require('../controllers/userController');
 
-// GET /api/users?name=someName
-router.get('/', async (req, res) => {
-  const { name } = req.query;
+router.get('/search', userController.searchUsers);
+// GET /api/users/search?query=someText
+router.get('/search', async (req, res) => {
+  const { query } = req.query;
 
-  if (!name) {
-    return res.status(400).json({ message: 'Missing query parameter: name' });
+  if (!query || query.trim() === '') {
+    return res.status(400).json({ message: 'Query parameter is required' });
   }
 
   try {
-    // Find users where name matches (case-insensitive partial match)
     const users = await User.findAll({
       where: {
-        name: {
-          [require('sequelize').Op.like]: `%${name}%`
-        }
+        [Op.or]: [
+          { name: { [Op.like]: `%${query}%` } },
+          { email: { [Op.like]: `%${query}%` } },
+          { phone: { [Op.like]: `%${query}%` } },
+        ],
       },
-      attributes: ['id', 'name']
+      attributes: ['id', 'name', 'email', 'phone'],
+      limit: 10,
     });
 
     res.json(users);
   } catch (err) {
-    console.error('User fetch error:', err);
+    console.error('User search error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

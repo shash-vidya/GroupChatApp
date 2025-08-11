@@ -1,28 +1,35 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const { Model, DataTypes } = require('sequelize');
 
-const Message = sequelize.define('Message', {
-  content: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-  },
-  groupId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,  // make it nullable for now to fix FK constraint errors
-    references: {
-      model: 'Groups', // table name should match exactly
-      key: 'id',
-    },
-    onUpdate: 'CASCADE',
-    onDelete: 'SET NULL',
-  },
-  userId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
-}, {
-  tableName: 'Messages',
-  timestamps: true,
-});
+class Message extends Model {
+  static initModel(sequelize) {
+    Message.init({
+      id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+      },
+      content: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+      userId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+      groupId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+    }, {
+      sequelize,
+      modelName: 'Message',
+      tableName: 'Messages',
+      timestamps: true,
+      underscored: false, // optional, set true if you prefer snake_case columns like created_at
+    });
+
+    return Message;
+  }
+}
 
 module.exports = Message;

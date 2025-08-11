@@ -8,45 +8,73 @@
 </head>
 <body>
   <!-- Username Modal -->
-  <div id="usernameModal" class="modal">
+  <div id="usernameModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="usernameModalTitle">
     <div class="modal-content">
-      <h2>Enter your name to join the chat</h2>
-      <input type="text" id="usernameInput" placeholder="Your name" />
-      <button id="usernameSubmitBtn">Join Chat</button>
+      <h2 id="usernameModalTitle">Enter your name to join the chat</h2>
+      <input
+        type="text"
+        id="usernameInput"
+        placeholder="Your name"
+        autocomplete="username"
+        aria-label="Your name"
+      />
+      <button id="usernameSubmitBtn" class="btn primary-btn">Join Chat</button>
     </div>
   </div>
 
   <div class="chat-container">
     <!-- Chat Header -->
-    <header>
+    <header class="chat-header" role="banner">
       <h1>💬 Real-time Group Chat</h1>
-      <div id="currentGroupName"></div>
-
-      <button id="leaveBtn">Leave Chat</button>
+      <div id="currentGroupName" class="current-group-name" aria-live="polite" aria-atomic="true">
+        No Group Selected
+      </div>
+      <button id="leaveBtn" class="btn danger-btn" disabled aria-disabled="true">Leave Chat</button>
     </header>
 
     <!-- Sidebar Groups List -->
-    <aside class="sidebar">
+    <aside class="sidebar" role="complementary" aria-label="Groups and user management">
       <h3>Groups</h3>
-      <ul id="groupList" class="group-list"></ul>
-      <button id="createGroupBtn" class="create-group-btn">+ Create Group</button>
+      <ul id="groupList" class="group-list" role="list" aria-label="Available groups"></ul>
+
+      <!-- User Search & Manage Members Section -->
+      <h3>Search & Manage Members</h3>
+      <div id="userSearchSection">
+        <input
+          type="text"
+          id="userSearchInput"
+          placeholder="Search users to add..."
+          autocomplete="off"
+          aria-label="Search users to add"
+          aria-controls="userSearchResults"
+          aria-autocomplete="list"
+        />
+        <ul id="userSearchResults" role="listbox" aria-label="User search results"></ul>
+      </div>
+
+      <button id="createGroupBtn" class="btn primary-btn create-group-btn">+ Create Group</button>
     </aside>
 
     <!-- Chat Area -->
-    <main class="chat-main">
+    <main class="chat-main" role="main" aria-live="polite" aria-atomic="false">
       <!-- Online Users -->
-      <section id="userList" class="user-list">
+      <section id="userList" class="user-list" aria-label="Online users">
         <h3>Online Users</h3>
-        <!-- Buttons added dynamically -->
       </section>
 
       <!-- Messages -->
-      <section id="chatBox" class="chat-box">
-        <!-- Messages appear here -->
-      </section>
+      <section
+        id="chatBox"
+        class="chat-box"
+        aria-live="polite"
+        aria-atomic="false"
+        role="log"
+        tabindex="0"
+        aria-label="Chat messages"
+      ></section>
 
       <!-- Message Input -->
-      <form id="messageForm" autocomplete="off" class="message-form">
+      <form id="messageForm" autocomplete="off" class="message-form" novalidate>
         <input
           type="text"
           id="messageInput"
@@ -54,20 +82,27 @@
           required
           autocomplete="off"
           disabled
+          aria-label="Type your message"
         />
-        <button type="submit" disabled>Send</button>
+        <button type="submit" disabled class="btn primary-btn" aria-disabled="true">Send</button>
       </form>
     </main>
   </div>
 
   <!-- Create Group Modal -->
-  <div id="groupModal" class="modal hidden">
+  <div id="groupModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
     <div class="modal-content">
-      <h2>Create New Group</h2>
-      <input type="text" id="newGroupName" placeholder="Group name" />
+      <h2 id="groupModalTitle">Create New Group</h2>
+      <input
+        type="text"
+        id="newGroupName"
+        placeholder="Group name"
+        autocomplete="off"
+        aria-label="New group name"
+      />
       <div class="modal-buttons">
-        <button id="saveGroupBtn">Save</button>
-        <button id="cancelGroupBtn">Cancel</button>
+        <button id="saveGroupBtn" class="btn primary-btn">Save</button>
+        <button id="cancelGroupBtn" class="btn cancel-btn">Cancel</button>
       </div>
     </div>
   </div>

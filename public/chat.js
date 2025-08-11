@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   let username = localStorage.getItem('username');
   let userId = localStorage.getItem('userId') ? parseInt(localStorage.getItem('userId')) : null;
-  let token = localStorage.getItem('token');  // Your auth token
+  let token = localStorage.getItem('token'); // Your auth token
 
   // Modal elements
   const usernameModal = document.getElementById('usernameModal');
@@ -25,54 +25,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let groups = [];
   let localMessages = [];
 
-  // Show/hide modal
-  function showModal() { usernameModal.style.display = 'flex'; }
-  function hideModal() { usernameModal.style.display = 'none'; }
-
-  // Fetch user ID by username
-  async function fetchUserIdByUsername(name) {
-    const res = await fetch(`http://localhost:4000/api/users?name=${encodeURIComponent(name)}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    if (!res.ok) throw new Error('User not found');
-    const users = await res.json();
-    if (!users.length) throw new Error('User not found');
-    return users[0].id;
+  function showModal() {
+    if (usernameModal) usernameModal.style.display = 'flex';
+  }
+  function hideModal() {
+    if (usernameModal) usernameModal.style.display = 'none';
   }
 
-  // Set username and userId then init chat
-  async function setUsername(name) {
-    if (name && name.trim() !== '') {
-      username = name.trim();
-      try {
-        userId = await fetchUserIdByUsername(username);
-        localStorage.setItem('username', username);
-        localStorage.setItem('userId', userId);
-        hideModal();
-        initChat();
-      } catch (err) {
-        alert('User not found in database. Please register first.');
-      }
-    } else {
-      alert('You must enter a name to chat');
-    }
-  }
-
-  // Save/load messages locally (limit last 50)
-  function saveMessagesToLocal(groupId, messages) {
-    if (messages.length > 50) messages = messages.slice(messages.length - 50);
-    localStorage.setItem(`chatMessages_${groupId}`, JSON.stringify(messages));
-  }
-  function loadMessagesFromLocal(groupId) {
-    const msgs = localStorage.getItem(`chatMessages_${groupId}`);
-    if (!msgs) return [];
-    try { return JSON.parse(msgs); } catch { return []; }
-  }
-
-  // Display a chat message
   function displayMessage({ user, text, self = false, system = false, createdAt }) {
+    if (!chatBox) return;
+
     const div = document.createElement('div');
     div.classList.add('message');
     if (system) {
@@ -91,69 +53,73 @@ document.addEventListener('DOMContentLoaded', () => {
     return { user, text, createdAt: createdAt || new Date().toISOString() };
   }
 
-  // Clear chat messages
   function clearMessages() {
-    chatBox.innerHTML = '';
+    if (chatBox) chatBox.innerHTML = '';
   }
 
-  // Update online users list
-  function updateOnlineUsers(users) {
-    userList.innerHTML = '';
-    users.forEach(user => {
-      const btn = document.createElement('button');
-      btn.textContent = user;
-      btn.disabled = true;
-      userList.appendChild(btn);
-    });
-  }
-
-  // Render groups list
   function renderGroups() {
+    if (!groupList) return;
     groupList.innerHTML = '';
     groups.forEach(g => {
       const li = document.createElement('li');
       li.textContent = g.name;
       li.dataset.groupId = g.id;
-      if (g.id === currentGroupId) li.classList.add('active');
+      if (Number(g.id) === currentGroupId) li.classList.add('active');
+      li.style.cursor = 'pointer';
       li.addEventListener('click', () => {
-        if (currentGroupId !== g.id) selectGroup(g.id, g.name);
+        if (currentGroupId !== Number(g.id)) selectGroup(g.id, g.name);
       });
       groupList.appendChild(li);
     });
   }
 
-  // Select a group and load messages
   async function selectGroup(groupId, groupName) {
-    currentGroupId = groupId;
+    currentGroupId = Number(groupId);
+
     const currentGroupNameElem = document.getElementById('currentGroupName');
     if (currentGroupNameElem) currentGroupNameElem.textContent = groupName;
 
-    messageInput.disabled = false;
-    messageForm.querySelector('button').disabled = false;
+    if (messageInput) {
+      messageInput.disabled = false;
+      messageInput.focus();
+    }
+    if (messageForm) {
+      const btn = messageForm.querySelector('button[type="submit"]');
+      if (btn) {
+        btn.disabled = false;
+        btn.setAttribute('aria-disabled', 'false');
+      }
+    }
+    if (leaveBtn) {
+      leaveBtn.disabled = false;
+      leaveBtn.setAttribute('aria-disabled', 'false');
+    }
 
-    localMessages = loadMessagesFromLocal(groupId);
+    localMessages = loadMessagesFromLocal(currentGroupId);
     clearMessages();
+    localMessages.forEach(msg =>
+      displayMessage({
+        user: msg.user,
+        text: msg.text,
+        self: msg.user === username,
+        createdAt: msg.createdAt,
+      })
+    );
 
-    localMessages.forEach(msg => displayMessage({
-      user: msg.user,
-      text: msg.text,
-      self: msg.user === username,
-      createdAt: msg.createdAt
-    }));
-
-    // Fetch new messages after last one
-    let lastCreatedAt = localMessages.length ? localMessages[localMessages.length - 1].createdAt : null;
+    const lastCreatedAt = localMessages.length
+      ? localMessages[localMessages.length - 1].createdAt
+      : null;
 
     try {
-      const url = lastCreatedAt
-        ? `http://localhost:4000/api/messages/${groupId}?after=${encodeURIComponent(lastCreatedAt)}&userId=${userId}`
-        : `http://localhost:4000/api/messages/${groupId}?userId=${userId}`;
+      let url = `http://localhost:4000/api/messages/${currentGroupId}`;
+      if (lastCreatedAt) {
+        url += `?after=${encodeURIComponent(lastCreatedAt)}`;
+      }
 
       const res = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` },
       });
+
       if (res.ok) {
         const messages = await res.json();
         messages.forEach(msg => {
@@ -161,11 +127,11 @@ document.addEventListener('DOMContentLoaded', () => {
             user: msg.User?.name || 'Unknown',
             text: msg.content,
             self: msg.User?.name === username,
-            createdAt: msg.createdAt
+            createdAt: msg.createdAt,
           });
           localMessages.push(displayed);
         });
-        saveMessagesToLocal(groupId, localMessages);
+        saveMessagesToLocal(currentGroupId, localMessages);
       } else {
         console.error('Failed to fetch new messages:', res.status);
       }
@@ -174,35 +140,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Show/hide create group modal
+  function saveMessagesToLocal(groupId, messages) {
+    if (messages.length > 50) messages = messages.slice(messages.length - 50);
+    localStorage.setItem(`chatMessages_${groupId}`, JSON.stringify(messages));
+  }
+
+  function loadMessagesFromLocal(groupId) {
+    const msgs = localStorage.getItem(`chatMessages_${groupId}`);
+    if (!msgs) return [];
+    try {
+      return JSON.parse(msgs);
+    } catch {
+      return [];
+    }
+  }
+
   function toggleGroupModal(show) {
+    if (!groupModal || !newGroupNameInput) return;
+
     if (show) {
       groupModal.classList.remove('hidden');
       newGroupNameInput.value = '';
+      newGroupNameInput.focus();
+      if (saveGroupBtn) saveGroupBtn.disabled = false;
     } else {
       groupModal.classList.add('hidden');
     }
   }
 
-  // Create group API call with error handling and debug logs
   async function createGroup(groupName) {
+    if (!userId || !token) {
+      alert('User not logged in properly. Please login again.');
+      return;
+    }
+
     try {
-      if (!userId) {
-        alert('User ID missing. Please login again.');
-        return;
-      }
-      console.log('Creating group:', groupName, 'UserId:', userId);
       const res = await fetch('http://localhost:4000/api/groups', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ name: groupName, userIds: [userId] })
+        body: JSON.stringify({ name: groupName, userIds: [userId], creatorId: userId }),
       });
-      console.log('Create group response status:', res.status);
+
+      const data = await res.json();
+
       if (res.ok) {
-        const data = await res.json();
+        if (!data.group) {
+          alert('Group data missing in response.');
+          return;
+        }
         groups.push(data.group);
         renderGroups();
         selectGroup(data.group.id, data.group.name);
@@ -218,28 +206,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Declare socket variable here, so accessible in submit event
   let socket;
 
-  // Initialize socket and chat
   function initChat() {
-    socket = io('http://localhost:4000');
+    socket = io('http://localhost:4000', {
+      auth: {
+        token: token
+      }
+    });
 
     socket.on('connect', () => {
       console.log('Socket connected:', socket.id);
-      socket.emit('join', username);
-      socket.emit('getGroups', userId); // Request groups for user
+      socket.emit('join', { username, userId });
+      socket.emit('getGroups', userId);
     });
 
-    socket.on('groupsList', (userGroups) => {
+    socket.on('groupsList', userGroups => {
       groups = userGroups;
       renderGroups();
       if (groups.length > 0) selectGroup(groups[0].id, groups[0].name);
     });
 
-    socket.on('message', (msg) => {
-      // Ignore messages not for current group
-      if (msg.groupId !== currentGroupId) return;
+    socket.on('message', msg => {
+      if (Number(msg.groupId) !== Number(currentGroupId)) return;
 
       if (msg.user === 'System') {
         displayMessage({ user: 'System', text: msg.text, system: true });
@@ -250,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
         user: msg.user,
         text: msg.text,
         self: msg.user === username,
-        createdAt: new Date().toISOString(),
+        createdAt: msg.createdAt,
       });
       localMessages.push(displayed);
       saveMessagesToLocal(currentGroupId, localMessages);
@@ -258,68 +247,107 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('updateUsers', updateOnlineUsers);
 
-    socket.on('connect_error', (err) => {
+    socket.on('connect_error', err => {
       console.error('Socket connection error:', err);
     });
 
-    socket.on('error', (err) => {
+    socket.on('error', err => {
       console.error('Socket error:', err);
     });
   }
 
-  // Send message form event listener (added once outside initChat)
-  messageForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const text = messageInput.value.trim();
-    if (!text || !currentGroupId) return;
+  function updateOnlineUsers(users) {
+    if (!userList) return;
+    userList.innerHTML = '';
+    users.forEach(user => {
+      const btn = document.createElement('button');
+      btn.textContent = user;
+      btn.disabled = true;
+      userList.appendChild(btn);
+    });
+  }
 
-    if (!socket || !socket.connected) {
-      alert('Socket not connected yet. Please wait.');
-      return;
-    }
-
-    // Emit chatMessage with user, text, and groupId
-    socket.emit('chatMessage', { user: username, text, groupId: currentGroupId });
-    messageInput.value = '';
-  });
-
-  // Leave chat button
-  leaveBtn.addEventListener('click', () => {
-    localStorage.removeItem('username');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('token');  // Remove token on logout
-    localStorage.clear();
-    alert('You have left the chat.');
-    window.location.reload();
-  });
-
-  // Group modal buttons
-  createGroupBtn.addEventListener('click', () => toggleGroupModal(true));
-  cancelGroupBtn.addEventListener('click', () => toggleGroupModal(false));
-  saveGroupBtn.addEventListener('click', () => {
-    const groupName = newGroupNameInput.value.trim();
-    if (!groupName) {
-      alert('Please enter a group name');
-      return;
-    }
-    createGroup(groupName);
-  });
-
-  // Username submit button
-  usernameSubmitBtn.addEventListener('click', () => {
-    const name = usernameInput.value.trim();
-    setUsername(name);
-  });
-
-  // Also allow Enter key in username input to submit
-  usernameInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
+  if (messageForm) {
+    messageForm.addEventListener('submit', e => {
       e.preventDefault();
-      usernameSubmitBtn.click();
-    }
-  });
+      if (!messageInput) return;
+      const text = messageInput.value.trim();
+      if (!text || !currentGroupId) return;
 
-  // Start: show modal or init chat
+      if (!socket || !socket.connected) {
+        alert('Socket not connected yet. Please wait.');
+        return;
+      }
+
+      // Optimistically display message immediately in UI
+      const displayed = displayMessage({
+        user: username,
+        text,
+        self: true,
+        createdAt: new Date().toISOString(),
+      });
+      localMessages.push(displayed);
+      saveMessagesToLocal(currentGroupId, localMessages);
+
+      // Send message to server
+      socket.emit('chatMessage', { user: username, text, groupId: currentGroupId });
+
+      messageInput.value = '';
+    });
+  }
+
+  if (leaveBtn) {
+    leaveBtn.addEventListener('click', () => {
+      if (socket) socket.disconnect();
+      localStorage.clear();
+      alert('You have left the chat.');
+      window.location.reload();
+    });
+  }
+
+  if (createGroupBtn) createGroupBtn.addEventListener('click', () => toggleGroupModal(true));
+  if (cancelGroupBtn) cancelGroupBtn.addEventListener('click', () => toggleGroupModal(false));
+  if (saveGroupBtn) {
+    saveGroupBtn.addEventListener('click', () => {
+      if (!newGroupNameInput) return;
+      const groupName = newGroupNameInput.value.trim();
+      if (!groupName) {
+        alert('Please enter a group name');
+        return;
+      }
+      createGroup(groupName);
+    });
+  }
+
+  if (usernameSubmitBtn) {
+    usernameSubmitBtn.addEventListener('click', () => {
+      if (!usernameInput) return;
+      const name = usernameInput.value.trim();
+      if (name) {
+        username = name;
+        localStorage.setItem('username', username);
+
+        // You need to set userId and token here after login or signup flow.
+        // Example: localStorage.setItem('userId', <id>);
+        // Example: localStorage.setItem('token', <token>);
+
+        hideModal();
+        initChat();
+      } else {
+        alert('Please enter your name');
+      }
+    });
+  }
+
+  if (usernameInput) {
+    usernameInput.addEventListener('keypress', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (usernameSubmitBtn) usernameSubmitBtn.click();
+      }
+    });
+  }
+
   if (!username || !userId || !token) {
     showModal();
   } else {

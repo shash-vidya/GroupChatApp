@@ -2,18 +2,18 @@ const { Message, User } = require('../models');
 
 // Send Message
 exports.sendMessage = async (req, res) => {
-  const { roomId, content } = req.body;
+  const { groupId, content } = req.body;  // changed from roomId to groupId
   const userId = req.user?.id; // from authMiddleware
 
-  if (!roomId || !content) {
-    return res.status(400).json({ message: 'Room ID and content are required' });
+  if (!groupId || !content) {
+    return res.status(400).json({ message: 'Group ID and content are required' });
   }
 
   try {
     const newMessage = await Message.create({
-      roomId,     // Make sure this column exists in your Message model & DB
+      groupId,   // corrected here
       content,
-      userId,     // Use userId if your model association uses userId as foreign key
+      userId,
     });
 
     return res.status(201).json({
@@ -28,19 +28,19 @@ exports.sendMessage = async (req, res) => {
 
 // Get Messages
 exports.getMessages = async (req, res) => {
-  const { roomId } = req.params;
+  const { groupId } = req.params;  // changed from roomId to groupId
 
-  if (!roomId) {
-    return res.status(400).json({ message: 'Room ID is required' });
+  if (!groupId) {
+    return res.status(400).json({ message: 'Group ID is required' });
   }
 
   try {
     const messages = await Message.findAll({
-      where: { roomId },  // <-- This requires your Messages table to have a roomId column
+      where: { groupId },  // corrected here
       include: [
         {
           model: User,
-          as: 'user',     // <-- The alias MUST match the one you used in Message model association
+          as: 'User',     // alias must match your association
           attributes: ['id', 'name', 'email'],
         },
       ],

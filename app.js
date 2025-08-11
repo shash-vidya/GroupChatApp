@@ -20,7 +20,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: 'http://127.0.0.1:5500',
+    origin: 'http://127.0.0.1:5500', // Your frontend URL
     methods: ['GET', 'POST'],
   },
 });
@@ -29,13 +29,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Add io to req for routes if needed
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
 
-// Mount routes
 app.use('/api/signup', signupRoute);
 app.use('/api/login', loginRoute);
 app.use('/api/protected', protectedRoute);
@@ -48,67 +46,57 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Socket.IO group chat handling
 io.on('connection', (socket) => {
   console.log('New user connected:', socket.id);
 
-  // Track groups this socket has joined
   socket.joinedGroups = new Set();
 
-  // Save username on join (optional)
   socket.on('join', (username) => {
     if (!username) return;
     socket.username = username;
     console.log(`Socket ${socket.id} associated with username: ${username}`);
   });
 
-  // Client requests groups for a user
   socket.on('getGroups', async (userId) => {
     try {
       if (!userId) {
         socket.emit('groupsList', []);
         return;
       }
-      // Find all groups where user is a member
+
       const userGroups = await Group.findAll({
         include: [{
           model: User,
           as: 'Users',
           where: { id: userId },
           attributes: [],
-          through: { attributes: [] }
+          through: { attributes: [] },
         }],
         attributes: ['id', 'name'],
       });
 
-      // Join rooms for all groups for message broadcasting
       userGroups.forEach(group => {
         socket.join(group.id.toString());
         socket.joinedGroups.add(group.id.toString());
       });
 
-      // Send groups list back to client
       socket.emit('groupsList', userGroups.map(g => ({ id: g.id, name: g.name })));
-
     } catch (err) {
       console.error('Error fetching groups:', err);
       socket.emit('groupsList', []);
     }
   });
 
-  // Handle incoming chat messages
   socket.on('chatMessage', async ({ user, text, groupId }) => {
     if (!user || !text || !groupId) return;
 
     try {
-      // Find user record
       const userRecord = await User.findOne({ where: { name: user } });
       if (!userRecord) {
         console.error('User not found for message:', user);
         return;
       }
 
-      // Check if user belongs to the group
       const membership = await GroupMember.findOne({
         where: { userId: userRecord.id, groupId }
       });
@@ -117,14 +105,13 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Save message to DB
       const message = await Message.create({
         content: text,
         userId: userRecord.id,
         groupId,
       });
 
-      // Broadcast message to group room only
+      // Broadcast the message to everyone in the group (including sender)
       io.to(groupId.toString()).emit('message', {
         user,
         text,
@@ -137,14 +124,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle disconnects
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
 });
 
-// Sequelize sync & start server
- sequelize.sync({ force: true })
+sequelize.sync({ force: false })
   .then(() => {
     const PORT = process.env.PORT || 4000;
     server.listen(PORT, () => {

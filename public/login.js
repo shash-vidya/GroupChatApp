@@ -16,7 +16,6 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       body: JSON.stringify({ email, password }),
     });
 
-    // Try to parse JSON only if content-type is JSON
     let data = null;
     const contentType = res.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
@@ -28,8 +27,12 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       return;
     }
 
-    alert("✅ Login successful!");
+    // Save token, userId, and username correctly
     localStorage.setItem("token", data.token);
+    localStorage.setItem("userId", data.user.id);
+    localStorage.setItem("username", data.user.name);
+
+    alert("✅ Login successful!");
     window.location.href = "chat.html";
   } catch (err) {
     console.error("Error:", err);
