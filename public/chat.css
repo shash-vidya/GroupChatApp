@@ -67,7 +67,7 @@ header button:hover {
   color: #555;
   flex-shrink: 0;
 
-  -webkit-user-select: none; /* Safari */
+  -webkit-user-select: none; /* Safari & Chrome */
   -moz-user-select: none;    /* Firefox */
   -ms-user-select: none;     /* IE10+ */
   user-select: none;         /* Standard */
@@ -84,10 +84,10 @@ header button:hover {
   cursor: default;
   white-space: nowrap;
 
-  -webkit-user-select: none; /* Safari */
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
+  -webkit-user-select: none; /* Safari & Chrome */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* IE10+ */
+  user-select: none;         /* Standard */
 
   transition: background-color 0.3s ease;
 }
@@ -106,10 +106,10 @@ header button:hover {
   flex-direction: column;
   gap: 12px;
 
-  -webkit-user-select: text; /* Safari */
-  -moz-user-select: text;
-  -ms-user-select: text;
-  user-select: text;
+  -webkit-user-select: text; /* Safari & Chrome */
+  -moz-user-select: text;    /* Firefox */
+  -ms-user-select: text;     /* IE10+ */
+  user-select: text;         /* Standard */
 }
 
 /* Message bubble */
@@ -123,10 +123,10 @@ header button:hover {
   word-wrap: break-word;
   position: relative;
 
-  -webkit-user-select: text; /* Safari */
-  -moz-user-select: text;
-  -ms-user-select: text;
-  user-select: text;
+  -webkit-user-select: text; /* Safari & Chrome */
+  -moz-user-select: text;    /* Firefox */
+  -ms-user-select: text;     /* IE10+ */
+  user-select: text;         /* Standard */
 
   transition: background-color 0.3s ease;
 }
@@ -154,10 +154,10 @@ header button:hover {
   max-width: 100%;
   padding: 0;
 
-  -webkit-user-select: none; /* Safari */
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
+  -webkit-user-select: none; /* Safari & Chrome */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* IE10+ */
+  user-select: none;         /* Standard */
 }
 
 /* Message form */
@@ -178,10 +178,10 @@ header button:hover {
   outline: none;
   transition: border-color 0.3s ease;
 
-  -webkit-user-select: text; /* Safari */
-  -moz-user-select: text;
-  -ms-user-select: text;
-  user-select: text;
+  -webkit-user-select: text; /* Safari & Chrome */
+  -moz-user-select: text;    /* Firefox */
+  -ms-user-select: text;     /* IE10+ */
+  user-select: text;         /* Standard */
 }
 
 #messageInput:focus {

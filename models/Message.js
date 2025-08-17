@@ -6,20 +6,29 @@ const Message = sequelize.define('Message', {
     type: DataTypes.TEXT,
     allowNull: false,
   },
+
   groupId: {
     type: DataTypes.INTEGER,
-    allowNull: true,  // make it nullable for now to fix FK constraint errors
+    allowNull: false,   // group is required for messages
     references: {
-      model: 'Groups', // table name should match exactly
+      model: 'Groups',
       key: 'id',
     },
     onUpdate: 'CASCADE',
-    onDelete: 'SET NULL',
+    onDelete: 'CASCADE',
   },
+
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id',
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
   },
+
 }, {
   tableName: 'Messages',
   timestamps: true,

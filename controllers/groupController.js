@@ -1,62 +1,197 @@
-const { Group, User, GroupMember } = require('../models');
+const { Op } = require('sequelize');
+const { User, Group, GroupMember } = require('../models');
 
+// Create group
 exports.createGroup = async (req, res) => {
-  const { name, userIds } = req.body;
-
-  if (!name || !userIds || !Array.isArray(userIds) || userIds.length === 0) {
-    return res.status(400).json({ message: 'Group name and at least one user ID are required' });
-  }
-
   try {
-    // Check if group name already exists
-    const existingGroup = await Group.findOne({ where: { name } });
-    if (existingGroup) {
-      return res.status(409).json({ message: 'Group with this name already exists' });
+    const creatorId = req.user.id;
+    const { name, userIds = [] } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Group name is required' });
     }
 
-    // Verify all userIds exist in the User table
-    const users = await User.findAll({
-      where: { id: userIds }
-    });
+    const uniqueUserIds = Array.from(new Set([creatorId, ...userIds]));
+    const group = await Group.create({ name: name.trim(), creatorId });
 
-    if (users.length !== userIds.length) {
-      return res.status(400).json({ message: 'One or more userIds do not exist' });
-    }
-
-    // Create new group
-    const group = await Group.create({ name });
-
-    // Add users to group through GroupMember
-    const groupMembers = userIds.map(userId => ({ userId, groupId: group.id }));
+    const groupMembers = uniqueUserIds.map(uid => ({
+      userId: uid,
+      groupId: group.id,
+      isAdmin: uid === creatorId,
+    }));
     await GroupMember.bulkCreate(groupMembers);
 
-    // Return created group including users (alias 'Users')
-    const createdGroup = await Group.findByPk(group.id, {
-      include: [{ model: User, as: 'Users', through: { attributes: [] } }],
+    return res.status(201).json({
+      message: 'Group created successfully',
+      group: { id: group.id, name: group.name },
     });
-
-    return res.status(201).json({ message: 'Group created successfully', group: createdGroup });
-  } catch (error) {
-    console.error('Create group error:', error);
-    return res.status(500).json({ message: 'Server error' });
+  } catch (err) {
+    console.error('createGroup error:', err);
+    return res.status(500).json({ message: 'Server error while creating group' });
   }
 };
 
+// Get groups of a user
 exports.getUserGroups = async (req, res) => {
-  const userId = req.params.userId;
-
   try {
-    const user = await User.findByPk(userId, {
-      include: [{ model: Group, as: 'Groups', through: { attributes: [] } }],
+    const { userId } = req.params;
+
+    const groups = await Group.findAll({
+      include: [{
+        model: User,
+        as: 'users',
+        where: { id: userId },
+        attributes: [],
+        through: { attributes: [] },
+      }],
+      attributes: ['id', 'name'],
+      order: [['createdAt', 'DESC']],
     });
 
+    return res.json(groups);
+  } catch (err) {
+    console.error('getUserGroups error:', err);
+    return res.status(500).json({ message: 'Server error while fetching groups' });
+  }
+};
+
+// Admin: add user to group
+exports.addUserToGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId is required' });
+    }
+
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    return res.json(user.Groups);
-  } catch (error) {
-    console.error('Get user groups error:', error);
-    return res.status(500).json({ message: 'Server error' });
+    const existing = await GroupMember.findOne({ where: { groupId, userId } });
+    if (existing) {
+      return res.status(409).json({ message: 'User already in group' });
+    }
+
+    await GroupMember.create({ groupId, userId, isAdmin: false });
+
+    return res.status(201).json({
+      message: 'User added to group successfully',
+      addedUser: { id: user.id, name: user.name, email: user.email }
+    });
+  } catch (err) {
+    console.error('addUserToGroup error:', err);
+    return res.status(500).json({ message: 'Server error while adding user' });
+  }
+};
+
+// Admin: make user admin
+exports.makeAdmin = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { userId } = req.body;
+
+    const membership = await GroupMember.findOne({ where: { groupId, userId } });
+    if (!membership) {
+      return res.status(404).json({ message: 'User is not a member of this group' });
+    }
+
+    if (membership.isAdmin) {
+      return res.status(400).json({ message: 'User is already an admin' });
+    }
+
+    membership.isAdmin = true;
+    await membership.save();
+
+    return res.json({ message: 'User promoted to admin successfully' });
+  } catch (err) {
+    console.error('makeAdmin error:', err);
+    return res.status(500).json({ message: 'Server error while promoting admin' });
+  }
+};
+
+// Admin: remove user
+exports.removeUserFromGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { userId } = req.body;
+
+    const membership = await GroupMember.findOne({ where: { groupId, userId } });
+    if (!membership) {
+      return res.status(404).json({ message: 'User is not a member of this group' });
+    }
+
+    await membership.destroy();
+    return res.json({ message: 'User removed from group successfully' });
+  } catch (err) {
+    console.error('removeUserFromGroup error:', err);
+    return res.status(500).json({ message: 'Server error while removing user' });
+  }
+};
+
+// Get group members
+exports.getGroupMembers = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+
+    const members = await GroupMember.findAll({
+      where: { groupId },
+      include: [{ model: User, attributes: ['id', 'name', 'email', 'phone'] }],
+      order: [[User, 'name', 'ASC']],
+    });
+
+    const result = members.map(m => ({
+      userId: m.userId,
+      name: m.User?.name,
+      email: m.User?.email,
+      phone: m.User?.phone,
+      isAdmin: m.isAdmin,
+    }));
+
+    return res.json(result);
+  } catch (err) {
+    console.error('getGroupMembers error:', err);
+    return res.status(500).json({ message: 'Server error while fetching members' });
+  }
+};
+
+// Check admin
+exports.isAdmin = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.id;
+
+    const membership = await GroupMember.findOne({ where: { groupId, userId, isAdmin: true } });
+    return res.json({ isAdmin: !!membership });
+  } catch (err) {
+    console.error('isAdmin error:', err);
+    return res.status(500).json({ message: 'Server error while checking admin' });
+  }
+};
+
+// Search users
+exports.searchUsers = async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.trim() === '') return res.json([]);
+
+    const users = await User.findAll({
+      where: {
+        [Op.or]: [
+          { name: { [Op.like]: `%${q}%` } },
+          { email: { [Op.like]: `%${q}%` } },
+          { phone: { [Op.like]: `%${q}%` } },
+        ],
+      },
+      attributes: ['id', 'name', 'email', 'phone'],
+      limit: 20,
+    });
+
+    return res.json(users);
+  } catch (err) {
+    console.error('searchUsers error:', err);
+    return res.status(500).json({ message: 'Server error while searching users' });
   }
 };

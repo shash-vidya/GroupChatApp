@@ -7,6 +7,10 @@ const Group = sequelize.define('Group', {
     allowNull: false,
     unique: true,
   },
+  creatorId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,    // the user who created the group (admin by default)
+  },
 }, {
   tableName: 'Groups',
   timestamps: true,

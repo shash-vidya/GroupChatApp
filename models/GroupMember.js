@@ -10,8 +10,12 @@ const GroupMember = sequelize.define('GroupMember', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  isAdmin: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,   // marks if this member is an admin in the group
+  }
 }, {
-  tableName: 'GroupMember',
+  tableName: 'GroupMembers',  // plural for consistency
   timestamps: true,
 });
 

@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // User info and token from localStorage
   let username = localStorage.getItem('username');
   let userId = localStorage.getItem('userId') ? parseInt(localStorage.getItem('userId')) : null;
-  let token = localStorage.getItem('token');  // Your auth token
+  let token = localStorage.getItem('token');
 
   // Modal elements
   const usernameModal = document.getElementById('usernameModal');
@@ -20,49 +21,46 @@ document.addEventListener('DOMContentLoaded', () => {
   const newGroupNameInput = document.getElementById('newGroupName');
   const saveGroupBtn = document.getElementById('saveGroupBtn');
   const cancelGroupBtn = document.getElementById('cancelGroupBtn');
+  const currentGroupNameElem = document.getElementById('currentGroupName');
 
   let currentGroupId = null;
   let groups = [];
   let localMessages = [];
+  let socket;
+  let amIAdminInGroup = false;
 
-  // Show/hide modal
   function showModal() { usernameModal.style.display = 'flex'; }
   function hideModal() { usernameModal.style.display = 'none'; }
 
-  // Fetch user ID by username
   async function fetchUserIdByUsername(name) {
     const res = await fetch(`http://localhost:4000/api/users?name=${encodeURIComponent(name)}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: { 'Authorization': `Bearer ${token}` }
     });
-    if (!res.ok) throw new Error('User not found');
+    if (!res.ok) throw new Error(await res.text());
     const users = await res.json();
     if (!users.length) throw new Error('User not found');
     return users[0].id;
   }
 
-  // Set username and userId then init chat
   async function setUsername(name) {
-    if (name && name.trim() !== '') {
-      username = name.trim();
-      try {
-        userId = await fetchUserIdByUsername(username);
-        localStorage.setItem('username', username);
-        localStorage.setItem('userId', userId);
-        hideModal();
-        initChat();
-      } catch (err) {
-        alert('User not found in database. Please register first.');
-      }
-    } else {
+    if (!name || name.trim() === '') {
       alert('You must enter a name to chat');
+      return;
+    }
+    username = name.trim();
+    try {
+      userId = await fetchUserIdByUsername(username);
+      localStorage.setItem('username', username);
+      localStorage.setItem('userId', userId);
+      hideModal();
+      await initChat();
+    } catch (err) {
+      alert('User not found in database. Please register first.');
     }
   }
 
-  // Save/load messages locally (limit last 50)
   function saveMessagesToLocal(groupId, messages) {
-    if (messages.length > 50) messages = messages.slice(messages.length - 50);
+    if (messages.length > 50) messages = messages.slice(-50);
     localStorage.setItem(`chatMessages_${groupId}`, JSON.stringify(messages));
   }
   function loadMessagesFromLocal(groupId) {
@@ -71,8 +69,23 @@ document.addEventListener('DOMContentLoaded', () => {
     try { return JSON.parse(msgs); } catch { return []; }
   }
 
-  // Display a chat message
-  function displayMessage({ user, text, self = false, system = false, createdAt }) {
+  function setGroupTitle(name, isAdmin) {
+    currentGroupNameElem.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = name;
+    currentGroupNameElem.appendChild(span);
+
+    if (isAdmin) {
+      const badge = document.createElement('span');
+      badge.textContent = ' 👑 Admin';
+      badge.style.marginLeft = '8px';
+      badge.style.fontSize = '0.9rem';
+      badge.style.color = '#d97706';
+      currentGroupNameElem.appendChild(badge);
+    }
+  }
+
+  function displayMessage({ username, text, self = false, system = false, createdAt }) {
     const div = document.createElement('div');
     div.classList.add('message');
     if (system) {
@@ -80,34 +93,29 @@ document.addEventListener('DOMContentLoaded', () => {
       div.textContent = `📢 ${text}`;
     } else if (self) {
       div.classList.add('self');
-      div.textContent = `${user}: ${text}`;
+      div.textContent = `${username}: ${text}`;
     } else {
       div.classList.add('other');
-      div.textContent = `${user}: ${text}`;
+      div.textContent = `${username}: ${text}`;
+    }
+    if (createdAt) {
+      const timeSpan = document.createElement('span');
+      timeSpan.style.fontSize = '0.75rem';
+      timeSpan.style.opacity = '0.6';
+      timeSpan.style.display = 'block';
+      timeSpan.style.marginTop = '4px';
+      timeSpan.textContent = new Date(createdAt).toLocaleTimeString();
+      div.appendChild(timeSpan);
     }
     chatBox.appendChild(div);
     chatBox.scrollTop = chatBox.scrollHeight;
-
-    return { user, text, createdAt: createdAt || new Date().toISOString() };
   }
 
-  // Clear chat messages
-  function clearMessages() {
+  function renderMessages() {
     chatBox.innerHTML = '';
+    localMessages.forEach(m => displayMessage(m));
   }
 
-  // Update online users list
-  function updateOnlineUsers(users) {
-    userList.innerHTML = '';
-    users.forEach(user => {
-      const btn = document.createElement('button');
-      btn.textContent = user;
-      btn.disabled = true;
-      userList.appendChild(btn);
-    });
-  }
-
-  // Render groups list
   function renderGroups() {
     groupList.innerHTML = '';
     groups.forEach(g => {
@@ -116,210 +124,256 @@ document.addEventListener('DOMContentLoaded', () => {
       li.dataset.groupId = g.id;
       if (g.id === currentGroupId) li.classList.add('active');
       li.addEventListener('click', () => {
-        if (currentGroupId !== g.id) selectGroup(g.id, g.name);
+        if (currentGroupId !== g.id) switchGroup(g.id);
       });
       groupList.appendChild(li);
     });
   }
 
-  // Select a group and load messages
-  async function selectGroup(groupId, groupName) {
-    currentGroupId = groupId;
-    const currentGroupNameElem = document.getElementById('currentGroupName');
-    if (currentGroupNameElem) currentGroupNameElem.textContent = groupName;
+  function renderMembers(members) {
+    userList.innerHTML = '';
+    const h = document.createElement('h3');
+    h.textContent = 'Members';
+    userList.appendChild(h);
+
+    if (amIAdminInGroup) {
+      const tools = document.createElement('div');
+      tools.style.marginBottom = '10px';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Search user by name...';
+      input.style.marginRight = '6px';
+
+      const addBtn = document.createElement('button');
+      addBtn.textContent = 'Add user';
+      addBtn.addEventListener('click', async () => {
+        const q = input.value.trim();
+        if (!q) return;
+        try {
+          // FIXED: global search (not group-based)
+          const res = await fetch(`http://localhost:4000/api/groups/search-users?q=${encodeURIComponent(q)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (!res.ok) throw new Error(await res.text());
+
+          const results = await res.json();
+          if (!results.length) { alert('No users found'); return; }
+          const picked = results[0];
+
+          const addRes = await fetch(`http://localhost:4000/api/groups/${currentGroupId}/addUser`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ userId: picked.id })
+          });
+          if (!addRes.ok) throw new Error(await addRes.text());
+
+          await refreshMembers();
+          input.value = '';
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+
+      tools.appendChild(input);
+      tools.appendChild(addBtn);
+      userList.appendChild(tools);
+    }
+
+    members.forEach(m => {
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.justifyContent = 'space-between';
+      row.style.padding = '6px 0';
+      row.style.borderBottom = '1px solid #eee';
+
+      const left = document.createElement('div');
+      left.textContent = `${m.name || 'User ' + m.userId}`;
+      if (m.isAdmin) {
+        const crown = document.createElement('span');
+        crown.textContent = ' 👑';
+        left.appendChild(crown);
+      }
+
+      const right = document.createElement('div');
+      if (amIAdminInGroup && m.userId !== userId) {
+        if (!m.isAdmin) {
+          const mk = document.createElement('button');
+          mk.textContent = 'Make admin';
+          mk.style.marginRight = '6px';
+          mk.addEventListener('click', async () => {
+            const res = await fetch(`http://localhost:4000/api/groups/${currentGroupId}/makeAdmin`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ userId: m.userId })
+            });
+            if (!res.ok) alert(await res.text());
+            await refreshMembers();
+          });
+          right.appendChild(mk);
+        }
+        const rm = document.createElement('button');
+        rm.textContent = 'Remove';
+        rm.addEventListener('click', async () => {
+          const res = await fetch(`http://localhost:4000/api/groups/${currentGroupId}/removeUser`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ userId: m.userId })
+          });
+          if (!res.ok) alert(await res.text());
+          await refreshMembers();
+        });
+        right.appendChild(rm);
+      }
+
+      row.appendChild(left);
+      row.appendChild(right);
+      userList.appendChild(row);
+    });
+  }
+
+  async function refreshAdminFlag() {
+    if (!currentGroupId) return;
+    try {
+      const res = await fetch(`http://localhost:4000/api/groups/${currentGroupId}/is-admin`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      amIAdminInGroup = !!data.isAdmin;
+    } catch {
+      amIAdminInGroup = false;
+    }
+    const groupName = groups.find(g => g.id === currentGroupId)?.name || '';
+    setGroupTitle(groupName, amIAdminInGroup);
+  }
+
+  async function refreshMembers() {
+    if (!currentGroupId) return;
+    const res = await fetch(`http://localhost:4000/api/groups/${currentGroupId}/members`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) return alert(await res.text());
+    const members = await res.json();
+    renderMembers(members);
+  }
+
+  async function switchGroup(newGroupId) {
+    if (currentGroupId === newGroupId) return;
+    currentGroupId = newGroupId;
+    localMessages = loadMessagesFromLocal(currentGroupId);
+    renderMessages();
+    await refreshAdminFlag();
+    await refreshMembers();
+  }
+
+  async function initChat() {
+    socket = io('http://localhost:4000', { auth: { token } });
+
+    socket.on('connect', () => {
+      console.log('✅ Connected to socket server');
+      socket.emit('join', username);
+      socket.emit('getGroups', userId);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('❌ Disconnected from socket server');
+    });
+
+    socket.on('groupsList', list => {
+      groups = list || [];
+      renderGroups();
+      if (groups.length) {
+        switchGroup(groups[0].id);
+      }
+    });
+
+    socket.on('message', data => {
+      if (data.groupId !== currentGroupId) return;
+
+      const msg = {
+        username: data.username,
+        text: data.text,
+        self: data.userId === userId,
+        createdAt: data.createdAt
+      };
+
+      localMessages.push(msg);
+      saveMessagesToLocal(currentGroupId, localMessages);
+      displayMessage(msg);
+    });
 
     messageInput.disabled = false;
     messageForm.querySelector('button').disabled = false;
-
-    localMessages = loadMessagesFromLocal(groupId);
-    clearMessages();
-
-    localMessages.forEach(msg => displayMessage({
-      user: msg.user,
-      text: msg.text,
-      self: msg.user === username,
-      createdAt: msg.createdAt
-    }));
-
-    // Fetch new messages after last one
-    let lastCreatedAt = localMessages.length ? localMessages[localMessages.length - 1].createdAt : null;
-
-    try {
-      const url = lastCreatedAt
-        ? `http://localhost:4000/api/messages/${groupId}?after=${encodeURIComponent(lastCreatedAt)}&userId=${userId}`
-        : `http://localhost:4000/api/messages/${groupId}?userId=${userId}`;
-
-      const res = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (res.ok) {
-        const messages = await res.json();
-        messages.forEach(msg => {
-          const displayed = displayMessage({
-            user: msg.User?.name || 'Unknown',
-            text: msg.content,
-            self: msg.User?.name === username,
-            createdAt: msg.createdAt
-          });
-          localMessages.push(displayed);
-        });
-        saveMessagesToLocal(groupId, localMessages);
-      } else {
-        console.error('Failed to fetch new messages:', res.status);
-      }
-    } catch (err) {
-      console.error('Error fetching new messages:', err);
-    }
   }
 
-  // Show/hide create group modal
-  function toggleGroupModal(show) {
-    if (show) {
-      groupModal.classList.remove('hidden');
-      newGroupNameInput.value = '';
-    } else {
-      groupModal.classList.add('hidden');
-    }
-  }
+  // Username modal events
+  usernameSubmitBtn.addEventListener('click', () => setUsername(usernameInput.value));
+  usernameInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') setUsername(usernameInput.value);
+  });
 
-  // Create group API call with error handling and debug logs
-  async function createGroup(groupName) {
-    try {
-      if (!userId) {
-        alert('User ID missing. Please login again.');
-        return;
-      }
-      console.log('Creating group:', groupName, 'UserId:', userId);
-      const res = await fetch('http://localhost:4000/api/groups', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ name: groupName, userIds: [userId] })
-      });
-      console.log('Create group response status:', res.status);
-      if (res.ok) {
-        const data = await res.json();
-        groups.push(data.group);
-        renderGroups();
-        selectGroup(data.group.id, data.group.name);
-        toggleGroupModal(false);
-      } else if (res.status === 409) {
-        alert('Group name already exists. Please choose another.');
-      } else {
-        alert('Failed to create group. Status: ' + res.status);
-      }
-    } catch (err) {
-      console.error('Create group error:', err);
-      alert('Failed to create group. See console for details.');
-    }
-  }
-
-  // Declare socket variable here, so accessible in submit event
-  let socket;
-
-  // Initialize socket and chat
-  function initChat() {
-    socket = io('http://localhost:4000');
-
-    socket.on('connect', () => {
-      console.log('Socket connected:', socket.id);
-      socket.emit('join', username);
-      socket.emit('getGroups', userId); // Request groups for user
-    });
-
-    socket.on('groupsList', (userGroups) => {
-      groups = userGroups;
-      renderGroups();
-      if (groups.length > 0) selectGroup(groups[0].id, groups[0].name);
-    });
-
-    socket.on('message', (msg) => {
-      // Ignore messages not for current group
-      if (msg.groupId !== currentGroupId) return;
-
-      if (msg.user === 'System') {
-        displayMessage({ user: 'System', text: msg.text, system: true });
-        return;
-      }
-
-      const displayed = displayMessage({
-        user: msg.user,
-        text: msg.text,
-        self: msg.user === username,
-        createdAt: new Date().toISOString(),
-      });
-      localMessages.push(displayed);
-      saveMessagesToLocal(currentGroupId, localMessages);
-    });
-
-    socket.on('updateUsers', updateOnlineUsers);
-
-    socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err);
-    });
-
-    socket.on('error', (err) => {
-      console.error('Socket error:', err);
-    });
-  }
-
-  // Send message form event listener (added once outside initChat)
-  messageForm.addEventListener('submit', (e) => {
+  // Send a message
+  messageForm.addEventListener('submit', e => {
     e.preventDefault();
+    if (!messageInput.value.trim() || !currentGroupId || !socket) return;
     const text = messageInput.value.trim();
-    if (!text || !currentGroupId) return;
-
-    if (!socket || !socket.connected) {
-      alert('Socket not connected yet. Please wait.');
-      return;
-    }
-
-    // Emit chatMessage with user, text, and groupId
-    socket.emit('chatMessage', { user: username, text, groupId: currentGroupId });
+    socket.emit('sendMessage', { groupId: currentGroupId, userId, username, text });
     messageInput.value = '';
   });
 
-  // Leave chat button
+  // Leave chat
   leaveBtn.addEventListener('click', () => {
-    localStorage.removeItem('username');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('token');  // Remove token on logout
     localStorage.clear();
-    alert('You have left the chat.');
-    window.location.reload();
+    location.reload();
   });
 
-  // Group modal buttons
-  createGroupBtn.addEventListener('click', () => toggleGroupModal(true));
-  cancelGroupBtn.addEventListener('click', () => toggleGroupModal(false));
-  saveGroupBtn.addEventListener('click', () => {
+  // Create group
+  createGroupBtn.addEventListener('click', () => {
+    groupModal.classList.remove('hidden');
+    newGroupNameInput.value = '';
+    newGroupNameInput.focus();
+  });
+
+  // Save new group
+  saveGroupBtn.addEventListener('click', async () => {
     const groupName = newGroupNameInput.value.trim();
     if (!groupName) {
       alert('Please enter a group name');
       return;
     }
-    createGroup(groupName);
-  });
-
-  // Username submit button
-  usernameSubmitBtn.addEventListener('click', () => {
-    const name = usernameInput.value.trim();
-    setUsername(name);
-  });
-
-  // Also allow Enter key in username input to submit
-  usernameInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      usernameSubmitBtn.click();
+    try {
+      const res = await fetch(`http://localhost:4000/api/groups`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: groupName, userIds: [userId] })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await res.json();
+      socket.emit('getGroups', userId); // refresh group list
+      groupModal.classList.add('hidden');
+    } catch (err) {
+      alert('Failed to create group: ' + err.message);
     }
   });
 
-  // Start: show modal or init chat
+  cancelGroupBtn.addEventListener('click', () => {
+    groupModal.classList.add('hidden');
+  });
+
   if (!username || !userId || !token) {
     showModal();
   } else {

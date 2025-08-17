@@ -36,7 +36,7 @@ router.get('/:groupId', authenticate, async (req, res) => {
     // Fetch messages with limit and include sender info
     const messages = await Message.findAll({
       where: whereCondition,
-      include: [{ model: User, as: 'User', attributes: ['id', 'name'] }],
+      include: [{ model: User, as: 'user', attributes: ['id', 'name'] }],
       order: [['createdAt', 'ASC']],
       limit,
     });
