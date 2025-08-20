@@ -3,61 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>💬 Real-time Group Chat</title>
+  <title>💬 Group Chat</title>
   <link rel="stylesheet" href="chat.css" />
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 </head>
 <body>
   <!-- Username Modal -->
   <div id="usernameModal" class="modal">
     <div class="modal-content">
-      <h2>Enter your name to join the chat</h2>
+      <h2>Enter your name to join</h2>
       <input type="text" id="usernameInput" placeholder="Your name" />
       <button id="usernameSubmitBtn">Join Chat</button>
     </div>
   </div>
 
+  <!-- Add User Modal (Admin Feature) -->
+  <div id="addUserModal" class="modal">
+    <div class="modal-content">
+      <h2>Add User to Group</h2>
+      <input type="text" id="addUserInput" placeholder="Username or email" />
+      <div class="modal-buttons">
+        <button id="addUserBtn">Add</button>
+        <button id="cancelAddUserBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Container -->
   <div class="chat-container">
-    <!-- Chat Header -->
+    <!-- Header -->
     <header>
-      <h1>💬 Real-time Group Chat</h1>
+      <h1>💬 Group Chat</h1>
       <div id="currentGroupName"></div>
-      <button id="leaveBtn">Leave Chat</button>
+      <button id="leaveBtn">Leave</button>
     </header>
 
-    <!-- Sidebar Groups List -->
+    <!-- Sidebar -->
     <aside class="sidebar">
-      <h3>Groups</h3>
+      <div class="groups-header">
+        <h3>Groups</h3>
+        <button id="createGroupBtn">+ New</button>
+      </div>
       <ul id="groupList" class="group-list"></ul>
-      <button id="createGroupBtn" class="create-group-btn">+ Create Group</button>
     </aside>
 
-    <!-- Chat Area -->
+    <!-- Chat Main -->
     <main class="chat-main">
-      <!-- Online Users -->
       <section id="userList" class="user-list">
-        <h3>Online Users</h3>
+        <h3>Members</h3>
       </section>
-
-      <!-- Messages -->
       <section id="chatBox" class="chat-box"></section>
-
-      <!-- Message Input -->
-      <form id="messageForm" autocomplete="off" class="message-form">
-        <input
-          type="text"
-          id="messageInput"
-          placeholder="Type your message..."
-          required
-          autocomplete="off"
-          disabled
-        />
+      <form id="messageForm" class="message-form" autocomplete="off">
+        <input type="text" id="messageInput" placeholder="Type a message..." disabled required />
         <button type="submit" disabled>Send</button>
       </form>
     </main>
   </div>
 
   <!-- Create Group Modal -->
-  <div id="groupModal" class="modal hidden">
+  <div id="groupModal" class="modal">
     <div class="modal-content">
       <h2>Create New Group</h2>
       <input type="text" id="newGroupName" placeholder="Group name" />
@@ -68,7 +72,34 @@
     </div>
   </div>
 
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <script src="chat.js"></script>
+  <script>
+    // Handle +New button -> show create group modal
+    document.getElementById("createGroupBtn").addEventListener("click", () => {
+      document.getElementById("groupModal").style.display = "flex";
+    });
+
+    // Handle Cancel button for create group modal
+    document.getElementById("cancelGroupBtn").addEventListener("click", () => {
+      document.getElementById("groupModal").style.display = "none";
+    });
+
+    // Handle Add User modal cancel
+    document.getElementById("cancelAddUserBtn").addEventListener("click", () => {
+      document.getElementById("addUserModal").style.display = "none";
+      document.getElementById("addUserInput").value = '';
+    });
+
+    // Optional: close modals on outside click
+    window.addEventListener("click", (event) => {
+      const groupModal = document.getElementById("groupModal");
+      const addUserModal = document.getElementById("addUserModal");
+      if (event.target === groupModal) groupModal.style.display = "none";
+      if (event.target === addUserModal) {
+        addUserModal.style.display = "none";
+        document.getElementById("addUserInput").value = '';
+      }
+    });
+  </script>
 </body>
 </html>

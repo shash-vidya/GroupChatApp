@@ -1,37 +1,38 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 
-const Message = sequelize.define('Message', {
-  content: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-  },
-
-  groupId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,   // group is required for messages
-    references: {
-      model: 'Groups',
-      key: 'id',
+const Message = sequelize.define(
+  'Message',
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
     },
-    onUpdate: 'CASCADE',
-    onDelete: 'CASCADE',
-  },
-
-  userId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'Users',
-      key: 'id',
+    content: {
+      type: DataTypes.TEXT,
+      allowNull: false,
     },
-    onUpdate: 'CASCADE',
-    onDelete: 'CASCADE',
+    group_id: {  // snake_case
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: { model: 'groups', key: 'id' },
+      onUpdate: 'CASCADE',
+      onDelete: 'CASCADE',
+    },
+    user_id: {  // snake_case
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: { model: 'users', key: 'id' },
+      onUpdate: 'CASCADE',
+      onDelete: 'CASCADE',
+    },
   },
-
-}, {
-  tableName: 'Messages',
-  timestamps: true,
-});
+  {
+    tableName: 'messages',
+    timestamps: true,
+    underscored: true, // converts createdAt → created_at
+  }
+);
 
 module.exports = Message;

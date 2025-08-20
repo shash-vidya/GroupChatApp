@@ -1,46 +1,108 @@
-const { Sequelize } = require('sequelize');
+
+const { DataTypes, Sequelize } = require('sequelize');
 const sequelize = require('../config/db');
 
-// Import models
-const User = require('./User');
-const Group = require('./Group');
-const GroupMember = require('./GroupMember');
-const Message = require('./Message');
+// ------------------------------
+// Models
+// ------------------------------
+const User = sequelize.define(
+  'User',
+  {
+    name: { type: DataTypes.STRING, allowNull: false },
+    email: { type: DataTypes.STRING, allowNull: true, unique: true },
+    phone: { type: DataTypes.STRING, allowNull: true },
+    password: { type: DataTypes.STRING, allowNull: true },
+  },
+  { tableName: 'users', underscored: true }
+);
 
-// =======================
-// Define Associations
-// =======================
+const Group = sequelize.define(
+  'Group',
+  {
+    name: { type: DataTypes.STRING, allowNull: false },
+    creator_id: { type: DataTypes.INTEGER, allowNull: false },
+  },
+  { tableName: 'groups', underscored: true }
+);
+
+const GroupMember = sequelize.define(
+  'GroupMember',
+  {
+    user_id: { type: DataTypes.INTEGER, allowNull: false },
+    group_id: { type: DataTypes.INTEGER, allowNull: false },
+    is_admin: { type: DataTypes.BOOLEAN, defaultValue: false },
+  },
+  { tableName: 'group_members', underscored: true }
+);
+
+const Message = sequelize.define(
+  'Message',
+  {
+    content: { type: DataTypes.TEXT, allowNull: false },
+    user_id: { type: DataTypes.INTEGER, allowNull: false },
+    group_id: { type: DataTypes.INTEGER, allowNull: false },
+  },
+  { tableName: 'messages', underscored: true }
+);
+
+const ArchivedMessage = sequelize.define(
+  'ArchivedMessage',
+  {
+    content: { type: DataTypes.TEXT, allowNull: false },
+    user_id: { type: DataTypes.INTEGER, allowNull: false },
+    group_id: { type: DataTypes.INTEGER, allowNull: false },
+    archived_at: { type: DataTypes.DATE, defaultValue: Sequelize.NOW },
+  },
+  { tableName: 'archived_messages', underscored: true }
+);
+
+// ------------------------------
+// Associations
+// ------------------------------
 
 // User ↔ Group (Many-to-Many via GroupMember)
-User.belongsToMany(Group, { through: GroupMember, as: 'groups', foreignKey: 'userId' });
-Group.belongsToMany(User, { through: GroupMember, as: 'users', foreignKey: 'groupId' });
+User.belongsToMany(Group, {
+  through: GroupMember,
+  as: 'groups',
+  foreignKey: 'user_id',
+  otherKey: 'group_id',
+});
+Group.belongsToMany(User, {
+  through: GroupMember,
+  as: 'users',
+  foreignKey: 'group_id',
+  otherKey: 'user_id',
+});
 
-// GroupMember ↔ User & Group (pivot table relations)
-GroupMember.belongsTo(User, { foreignKey: 'userId' });
-GroupMember.belongsTo(Group, { foreignKey: 'groupId' });
-User.hasMany(GroupMember, { foreignKey: 'userId' });
-Group.hasMany(GroupMember, { foreignKey: 'groupId' });
+// GroupMember ↔ User & Group
+GroupMember.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+GroupMember.belongsTo(Group, { foreignKey: 'group_id', as: 'group' });
 
-// =======================
-// Messages
-// =======================
+User.hasMany(GroupMember, { foreignKey: 'user_id', as: 'memberships' });
+Group.hasMany(GroupMember, { foreignKey: 'group_id', as: 'memberships' });
 
-// Each message belongs to a single user
-Message.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-User.hasMany(Message, { foreignKey: 'userId', as: 'messages' });
+// Messages ↔ User & Group
+Message.belongsTo(User, { foreignKey: 'user_id', as: 'sender' });
+User.hasMany(Message, { foreignKey: 'user_id', as: 'messages' });
 
-// Each message belongs to a single group
-Message.belongsTo(Group, { foreignKey: 'groupId', as: 'group' });
-Group.hasMany(Message, { foreignKey: 'groupId', as: 'messages' });
+Message.belongsTo(Group, { foreignKey: 'group_id', as: 'group' });
+Group.hasMany(Message, { foreignKey: 'group_id', as: 'messages' });
 
-// =======================
-// Export everything
-// =======================
+// ArchivedMessages ↔ User & Group
+ArchivedMessage.belongsTo(User, { foreignKey: 'user_id', as: 'sender' });
+ArchivedMessage.belongsTo(Group, { foreignKey: 'group_id', as: 'group' });
+
+User.hasMany(ArchivedMessage, { foreignKey: 'user_id', as: 'archivedMessages' });
+Group.hasMany(ArchivedMessage, { foreignKey: 'group_id', as: 'archivedMessages' });
+
+// ------------------------------
+// Export
+// ------------------------------
 module.exports = {
   sequelize,
-  Sequelize,
   User,
   Group,
   GroupMember,
   Message,
+  ArchivedMessage,
 };

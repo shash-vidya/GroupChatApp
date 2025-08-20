@@ -3,23 +3,42 @@ const jwt = require('jsonwebtoken');
 module.exports = (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
+
     if (!authHeader) {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    const parts = authHeader.split(' ');
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    const [scheme, token] = authHeader.split(' ');
+
+    if (scheme !== 'Bearer' || !token) {
       return res.status(401).json({ message: 'Invalid token format' });
     }
 
-    const token = parts[1];
-
+    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-    req.user = { id: decoded.id, name: decoded.name, email: decoded.email };
 
-    next();
+    // Make sure decoded has required fields
+    if (!decoded.id) {
+      return res.status(401).json({ message: 'Token missing user ID' });
+    }
+
+    // Attach user info to request
+    req.user = {
+      id: decoded.id,
+      name: decoded.name || null,
+      email: decoded.email || null
+    };
+
+    next(); // proceed to next middleware/controller
   } catch (err) {
     console.error('Auth error:', err.message);
-    return res.status(401).json({ message: 'Invalid or expired token' });
+
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired. Please log in again.' });
+    } else if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token. Please log in again.' });
+    }
+
+    return res.status(500).json({ message: 'Authentication failed', error: err.message });
   }
 };

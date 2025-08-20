@@ -1,76 +1,55 @@
-const { Message, User, GroupMember } = require('../models');
 
-// Send Message via REST API
-exports.sendMessage = async (req, res) => {
-  const { groupId, content } = req.body;
-  const userId = req.user?.id;
+const { Message, GroupMember, User } = require('../models');
 
-  if (!groupId || !content) {
-    return res.status(400).json({ message: 'Group ID and content are required' });
-  }
+module.exports = {
+  // Send message
+  sendMessage: async (req, res) => {
+    const { userId, text, groupId } = req.body;
+    if (!userId || !text || !groupId) return res.status(400).json({ message: 'Missing data' });
 
-  try {
-    // Ensure user is member of the group
-    const isMember = await GroupMember.findOne({ where: { userId, groupId } });
-    if (!isMember) {
-      return res.status(403).json({ message: 'You are not a member of this group' });
-    }
+    try {
+      const membership = await GroupMember.findOne({ where: { user_id: userId, group_id: groupId } });
+      if (!membership) return res.status(403).json({ message: 'User not in group' });
 
-    const newMessage = await Message.create({
-      groupId,
-      content,
-      userId,
-    });
+      const message = await Message.create({ user_id: userId, group_id: groupId, content: text });
+      const user = await User.findByPk(userId);
 
-    // Fetch with user info
-    const messageWithUser = await Message.findByPk(newMessage.id, {
-      include: [{ model: User, attributes: ['id', 'name'] }]
-    });
-
-    // Broadcast with socket.io if available
-    if (req.io) {
+      // Emit message to Socket.IO room
       req.io.to(groupId.toString()).emit('message', {
+        id: message.id,
+        userId,
+        username: user.name,
+        text: message.content,
         groupId,
-        userId: messageWithUser.User.id,
-        username: messageWithUser.User.name,
-        text: messageWithUser.content,
-        createdAt: messageWithUser.createdAt,
+        createdAt: message.createdAt
       });
+
+      res.status(201).json({ message: 'Message sent successfully' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Failed to send message' });
     }
+  },
 
-    return res.status(201).json({
-      message: 'Message sent successfully',
-      data: messageWithUser,
-    });
-  } catch (error) {
-    console.error('Send message error:', error);
-    return res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Get Messages for a group
-exports.getMessages = async (req, res) => {
-  const { groupId } = req.params;
-
-  if (!groupId) {
-    return res.status(400).json({ message: 'Group ID is required' });
-  }
-
-  try {
-    const messages = await Message.findAll({
-      where: { groupId },
-      include: [
-        {
-          model: User,
-          attributes: ['id', 'name', 'email'],
-        },
-      ],
-      order: [['createdAt', 'ASC']],
-    });
-
-    return res.status(200).json(messages);
-  } catch (error) {
-    console.error('Get messages error:', error);
-    return res.status(500).json({ message: 'Server error' });
+  // Get messages for a group
+  getMessages: async (req, res) => {
+    const { groupId } = req.params;
+    try {
+      const messages = await Message.findAll({
+        where: { group_id: groupId },
+        include: [{ model: User, as: 'sender', attributes: ['id', 'name'] }],
+        order: [['created_at', 'ASC']]
+      });
+      res.json(messages.map(m => ({
+        id: m.id,
+        text: m.content,
+        userId: m.user_id,
+        username: m.sender.name,
+        createdAt: m.created_at
+      })));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Failed to fetch messages' });
+    }
   }
 };
